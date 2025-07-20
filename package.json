@@ -1,0 +1,29 @@
+{
+  "name": "v-mo-cap",
+  "version": "0.1.0",
+  "description": "motion capture application",
+  "main": "src/main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "node esbuild-script.mjs && cross-env NODE_ENV=development electron ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ctzn07/v-mo-cap.git"
+  },
+  "author": "ctzn07",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ctzn07/v-mo-cap/issues"
+  },
+  "homepage": "https://github.com/ctzn07/v-mo-cap#readme",
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^37.2.0",
+    "esbuild": "^0.25.7"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  }
+}
