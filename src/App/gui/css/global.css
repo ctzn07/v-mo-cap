@@ -1,0 +1,65 @@
+@font-face {
+  font-family: 'ShareTech';
+  src: url('../Font/Share_Tech/ShareTech-Regular.ttf');
+}
+
+html, body {
+  margin: 0px;
+  padding: 0;
+  cursor: default;
+}
+
+:root {
+  --nav-height: 50px;
+  --main-spacing: 10px;
+  --primary-color: #222222;
+  --secondary-color: #333333;
+  --accent-color: #76899e;
+  --text-color: #f0ebeb;
+  --border-radius: 5px;
+
+  font-family: ShareTech;
+  line-height: 1;
+  font-weight: 500;
+  font-size: large;
+
+  color-scheme: light dark;
+  color: var(--text-color);
+  background-color: var(--primary-color);
+  user-select: none; 
+}
+
+* {
+  /*debug border*/
+  border: solid rgb(75, 75, 75) 1px;
+  border-radius: 0px;
+  margin: -1px;
+}
+
+a { color: var(--accent-color); }
+
+ul{ list-style-type: none; }
+
+#container {
+  top: calc(var(--nav-height) + var(--main-spacing));
+  left: var(--main-spacing);
+  right: var(--main-spacing);
+  bottom: var(--main-spacing);
+  position: fixed;
+  display: flex; 
+  overflow: hidden;
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+  scroll-snap-align: center;
+}
+
+.page {
+  min-width: 100%;
+  min-height: 100%;
+  
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: inherit;
+  scroll-snap-type: inherit;
+  scroll-snap-align: inherit;
+}

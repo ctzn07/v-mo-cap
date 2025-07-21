@@ -3,11 +3,17 @@ import * as esbuild from 'esbuild'
 
 //build App bundle
 await esbuild.build({
-    entryPoints: ['./src/App/gui/app.jsx'], 
+    entryPoints: ['./src/App/gui/app.jsx', './src/Tracker/gui/tracker.jsx'], 
     bundle: true, 
-    outfile: './dist/App.js', 
+    //outfile: './dist/App.js', 
+    outdir: './dist/', 
     //minify: true, 
-    //loader: {'.js':'jsx'}, 
+    loader: {
+        '.png': 'dataurl', 
+        '.svg': 'dataurl', 
+        '.ttf': 'file', 
+    }, 
+    jsx: 'automatic', 
     plugins: [], 
     logLevel: 'info'
 }).catch((e) => {
@@ -16,6 +22,7 @@ await esbuild.build({
     process.exit(1)
 })
 
+/*
 //build Tracker bundle
 await esbuild.build({
     entryPoints: ['./src/Tracker/gui/tracker.jsx'], 
@@ -30,5 +37,4 @@ await esbuild.build({
     console.log(e)
     process.exit(1)
 })
-//todo: add tracker bundling after App
-//console.log('esbuild done')
+*/

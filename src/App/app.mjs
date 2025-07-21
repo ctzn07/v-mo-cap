@@ -14,7 +14,7 @@ function createWindow(){
     },
     //autoHideMenuBar: true,
   })
-  const htmlpath = path.join(app.getAppPath() + '/App.html')
+  const htmlpath = path.join(app.getAppPath() + '/public/App.html')
   console.log(htmlpath)
   win.loadFile(htmlpath)
 
@@ -23,7 +23,6 @@ function createWindow(){
   return win
 }
 
-
 //initialization script
 export default function initApp(args){
   console.log('App initialized')
@@ -31,31 +30,3 @@ export default function initApp(args){
   console.log('opening main window...')
   createWindow()
 }
-
-
-
-
-
-
-
-
-
-/*
-newWindow(filepath){
-    const createWindow = () => {
-    const win = new BrowserWindow({
-      width: 800,
-      height: 600,
-      webPreferences:{
-          
-      }
-    })
-    //win.webContents.openDevTools()
-    win.loadFile('./src/App/index.html')
-  }
-
-    app.whenReady().then(() => {
-      createWindow()
-    })
-
-*/
