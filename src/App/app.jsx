@@ -1,7 +1,6 @@
 //script for App main GUI
 import * as React from 'react'
 import { createRoot } from 'react-dom/client'
-import './css/global.css'
 
 import Devices from './devices'
 
@@ -29,10 +28,10 @@ function Main({ children }){
     //gather prop data from all of the MainWindow children and pass it to Navigation
     return (
         <>
-            <div className='nav'>
+            <div>
                 <Navigation pages={React.Children.toArray(children).map((c) => c.props)}/>
             </div>
-            <div id='container'>{children}</div>
+            <div>{children}</div>
         </>
     )
 }
