@@ -15,7 +15,7 @@ await esbuild.build({
         './src/css/global.css'
     ], 
     bundle: true, 
-    outdir: 'dist/', 
+    outdir: './dist/', 
     //outbase: 'dist/',
     assetNames: '[name]',   //prevents renaming asset files(html) 
     //chunkNames: '[ext]/[name]', 

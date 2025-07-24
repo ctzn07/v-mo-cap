@@ -1,45 +1,36 @@
 //script for App main GUI
-import * as React from 'react'
+import { useRef, StrictMode } from "react";
 import { createRoot } from 'react-dom/client'
 
 import Devices from './devices'
+import Preview from './preview'
+import Config from './config'
 
 const root = createRoot(document.getElementById('root'))
+////document.getElementById(ref)?.scrollIntoView({ block: 'center' })
 
-//scrolls the page into view
-const scrollIntoView = (id) => document.getElementById(id)?.scrollIntoView({ inline: 'center' })
-
-function Navigation(props) {
-    const pages = []
-    //todo?: replace page.displayName with icon
-    if(props.pages instanceof Object){
-        for(const page of props.pages){
-            pages.push(
-                <button key={page.id} onClick={scrollIntoView(page.id)}>
-                    <img src={props.icon}/>{page.displayName}
-                </button>
-            )
-        }
-    }
-    return pages
+function TabButton(props){
+    return <button onClick={ () => {document.getElementById(props.id).scrollIntoView({ block: 'center' })} }> {props.name} </button>
 }
 
-function Main({ children }){
-    //gather prop data from all of the MainWindow children and pass it to Navigation
+function Main(){
     return (
         <>
-            <div>
-                <Navigation pages={React.Children.toArray(children).map((c) => c.props)}/>
+            <div className='tab'>
+                <TabButton id={'devices'} name={'Devices'}/>
+                <TabButton id={'preview'} name={'Preview'}/>
+                <TabButton id={'config'} name={'Config'}/>
             </div>
-            <div>{children}</div>
+            <Devices/>
+            <Preview/>
+            <Config/>
         </>
     )
 }
 
+
 root.render(
-    <React.StrictMode>
-        <Main>
-            <Devices displayName={'Devices'} id={'devices'}/>
-        </Main>
-    </React.StrictMode>
+    <StrictMode>
+        <Main/>
+    </StrictMode>
 )

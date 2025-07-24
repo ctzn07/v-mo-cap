@@ -15,7 +15,6 @@ function createWindow(){
     //autoHideMenuBar: true,
   })
   const htmlpath = path.join(app.getAppPath() + '/dist/app.html')
-  console.log(htmlpath)
   win.loadFile(htmlpath)
 
   if(isDev())win.webContents.openDevTools()

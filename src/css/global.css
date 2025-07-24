@@ -3,53 +3,90 @@
   src: url('../Font/Share_Tech/ShareTech-Regular.ttf');
 }
 
-html, body {
+body {
   margin: 0px;
   padding: 0;
   cursor: default;
 }
 
 :root {
-  --nav-height: 50px;
-  --main-spacing: 5px;
+  --main-spacing: 12px;
   --primary-color: #222222;
   --secondary-color: #333333;
-  --accent-color: #76899e;
+  --accent-color: #6ecc38;
   --text-color: #f0ebeb;
   --border-radius: 5px;
+  --tab-width: 64px;
 
   color-scheme: light dark;
   color: var(--text-color);
   background-color: var(--primary-color);
   user-select: none; 
-}
-
-* {
-  /*debug border*/
-  border: solid rgb(75, 75, 75) 1px;
-  border-radius: 0px;
-  margin: -1px;
-  /*debug border*/
-
-  font-family: ShareTech;
-  line-height: 1;
-  font-weight: 500;
-  font-size: large;
+  width: 100%;
+  overflow: hidden;
+  scroll-behavior: smooth;
+  scroll-snap-type: y mandatory;
+  scroll-snap-align: center;  
+  margin: -3px;
 }
 
 a {
   color: var(--accent-color);
+  display: block;
+  aspect-ratio: 1;
+  width: var(--tab-width);
 }
 
-ul { 
-  list-style-type: none;
+* {
+  font-family: ShareTech;
+  line-height: 1;
+  font-weight: 500;
+  font-size: large;
+  box-sizing: border-box;
+  border: 1px dotted var(--accent-color);
 }
 
-div {
+.tab {
+  float: left;
+  background-color: transparent;
+  position: fixed;
   margin: var(--main-spacing);
-  display: flex; 
+  height: calc(100% - (var(--main-spacing) * 2));
+}
+
+.tab button {
+  display: block;
+  background-color: inherit;
+  color: var(--text-color);
+  background-color: var(--primary-color);
+  aspect-ratio: 1;
+  border: none;
+  outline: none;
+  text-align: center;
+  width: var(--tab-width);
+  transition: 0.3s;
+}
+.tab button:hover {
+  background-color: var(--secondary-color);
+}
+
+.page {
+  float: right;
+  padding: 0px 12px;
+  width: calc(100% - (var(--tab-width) + var(--main-spacing) * 3));
+  height: calc(100vh - var(--main-spacing) * 2);
+  margin: var(--main-spacing);
+}
+
+
+
+
+/*
+{
+  margin: var(--main-spacing);
   overflow: hidden;
   scroll-behavior: smooth;
   scroll-snap-type: x mandatory;
   scroll-snap-align: center;
 }
+*/

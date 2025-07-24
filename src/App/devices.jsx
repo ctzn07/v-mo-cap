@@ -1,6 +1,6 @@
 function Devices(props){
 
-    return (<div>{'This is Device component'}</div>)
+    return (<div className="page" id="devices">{'This is Device component'}</div>)
 }
 
 export default Devices
