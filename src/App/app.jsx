@@ -1,5 +1,5 @@
 //script for App main GUI
-import { useRef, StrictMode } from "react";
+import { StrictMode } from "react"
 import { createRoot } from 'react-dom/client'
 
 import Devices from './devices'
@@ -10,20 +10,20 @@ const root = createRoot(document.getElementById('root'))
 ////document.getElementById(ref)?.scrollIntoView({ block: 'center' })
 
 function TabButton(props){
-    return <button onClick={ () => {document.getElementById(props.id).scrollIntoView({ block: 'center' })} }> {props.name} </button>
+    return <button onClick={ () => {document.getElementById(props.scrollTarget).scrollIntoView({ block: 'center' })} }>{props.text}</button>
 }
 
 function Main(){
     return (
         <>
             <div className='tab'>
-                <TabButton id={'devices'} name={'Devices'}/>
-                <TabButton id={'preview'} name={'Preview'}/>
-                <TabButton id={'config'} name={'Config'}/>
+                <TabButton scrollTarget={'devices'} text={'Devices'}/>
+                <TabButton scrollTarget={'preview'} text={'Preview'}/>
+                <TabButton scrollTarget={'config'} text={'Config'}/>
             </div>
-            <Devices/>
-            <Preview/>
-            <Config/>
+            <Devices id='devices'/>
+            <Preview id='preview'/>
+            <Config id='config'/>
         </>
     )
 }

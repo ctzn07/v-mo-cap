@@ -1,6 +1,6 @@
 function Config(props){
 
-    return (<div className="page" id="config">{'This is Config component'}</div>)
+    return (<div className="page" id={props.id}>{'This is Config component'}</div>)
 }
 
 export default Config
