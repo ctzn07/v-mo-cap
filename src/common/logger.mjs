@@ -1,16 +1,6 @@
-import { app } from 'electron'
 import fs from 'node:fs'
 import util from 'node:util'
-import path from 'path'
-
-//const log_path = path.join(app.getAppPath(), '')
-const log_path = './console.log'
-
-const streamOptions = {flags : 'w', encoding: 'utf-8', autoClose: true}
-
-const logStream = fs.createWriteStream(log_path, streamOptions)
-
-export const console = {}
+import { isDev } from './util.mjs'
 
 function shortTime(){
   const format = {
@@ -26,13 +16,25 @@ function shortTime(){
   return  new Intl.DateTimeFormat(systemLocale, format).format(new Date())
 }
 
+const log_path = './console.log'
+
+const streamOptions = {flags : 'w', encoding: 'utf-8', autoClose: true}
+
+const logStream = fs.createWriteStream(log_path, streamOptions)
+
+export const console = {}
+
+function write(msg, writelog = true){
+  if(isDev())process.stdout.write(util.format(msg) + '\n')
+  if(writelog)logStream.write(util.format(msg) + '\n')
+}
+
 console.log  = (...e) => {
   let message = shortTime() + ' LOG - '
   for(const a of e){
     (a instanceof Object) ? message += '\n' + JSON.stringify(a, null, 2) + ' ' : message += a + ' '
   }
-  logStream.write(util.format(message) + '\n')
-  process.stdout.write(util.format(message) + '\n')
+  write(message)
 }
 
 console.error = (...e) => {
@@ -40,8 +42,7 @@ console.error = (...e) => {
   for(const a of e){
     (a instanceof Object) ? message += '\n' + JSON.stringify(a, null, 2) + ' ' : message += a + ' '
   }
-  logStream.write(util.format(message) + '\n')
-  process.stdout.write(util.format(message) + '\n')
+  write(message)
 }
 
 console.print = (...e) => {
@@ -49,5 +50,5 @@ console.print = (...e) => {
   for(const a of e){
     (a instanceof Object) ? message += JSON.stringify(a, null, 2) + ' ' : message += a + ' '
   }
-  process.stdout.write(util.format(message) + '\n')
+  write(message, false)
 }

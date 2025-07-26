@@ -64,10 +64,20 @@ a {
   outline: none;
   text-align: center;
   width: var(--tab-width);
-  transition: 0.3s;
+  transition: 0.5s;
 }
 .tab button:hover {
   background-color: var(--secondary-color);
+}
+
+@keyframes fade {
+  40%, 60% {opacity: 0;}
+  50% {opacity: 1;}
+}
+
+.anim_fade {
+    animation: fade linear;
+    animation-timeline: view(block);
 }
 
 .page {
@@ -76,17 +86,8 @@ a {
   width: calc(100% - (var(--tab-width) + var(--main-spacing) * 3));
   height: calc(100vh - var(--main-spacing) * 2);
   margin: var(--main-spacing);
+  scroll-behavior: inherit;
+  scroll-snap-type: inherit;
+  scroll-snap-align: inherit;
+  opacity: 0;
 }
-
-
-
-
-/*
-{
-  margin: var(--main-spacing);
-  overflow: hidden;
-  scroll-behavior: smooth;
-  scroll-snap-type: x mandatory;
-  scroll-snap-align: center;
-}
-*/
