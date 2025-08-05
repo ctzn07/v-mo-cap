@@ -8,13 +8,14 @@ import Config from './config'
 
 const root = createRoot(document.getElementById('root'))
 
+const isDev = process.env.NODE_ENV === 'development'
+
 function TabButton(props){
     return <button onClick={ () => {document.getElementById(props.scrollTarget).scrollIntoView({ block: 'center' })} }>{props.text}</button>
 }
 
 function Main(){
-    return (
-        <>
+    const dev = (<StrictMode>
             <div className='tab'>
                 <TabButton scrollTarget={'devices'} text={'Devices'}/>
                 <TabButton scrollTarget={'config'} text={'Config'}/>
@@ -23,12 +24,19 @@ function Main(){
             <Devices id='devices'/>
             <Config id='config'/>
             <Preview id='preview'/>
-        </>
-    )
+        </StrictMode>)
+
+    const prod = (<>
+            <div className='tab'>
+                <TabButton scrollTarget={'devices'} text={'Devices'}/>
+                <TabButton scrollTarget={'config'} text={'Config'}/>
+                <TabButton scrollTarget={'preview'} text={'Preview'}/>
+            </div>
+            <Devices id='devices'/>
+            <Config id='config'/>
+            <Preview id='preview'/>
+        </>)
+    return isDev ? dev : prod
 }
 
-root.render(
-    <StrictMode>
-        <Main/>
-    </StrictMode>
-)
+root.render(<Main/>)

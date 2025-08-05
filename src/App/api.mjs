@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('api', {
 
     //UI Subscriptions
     stats: (callback) => ipcRenderer.on('previewdata', (...args) => callback(...args)), 
+    update: (callback) => ipcRenderer.on('update', (...args) => callback(...args)), 
     unsubsribe: (channel, listener) => ipcRenderer.removeListener(channel, listener), 
 
     //UI Data requests
@@ -15,5 +16,6 @@ contextBridge.exposeInMainWorld('api', {
 
     //UI Utility
     log: (message) => ipcRenderer.send('logmessage', message), 
+    error: (message) => ipcRenderer.send('logerror', message), 
     }
 )

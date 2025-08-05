@@ -5,14 +5,17 @@ import path from 'node:path'
 import { isDev } from './util.mjs'
 import { console } from './logger.mjs'
 
-export const config = {}
-
-console.log('Config manager initialized')
 //TODO: fix non-dev root path
-const root_path = path.join(app.getAppPath(), (isDev() ? '../../' : ''))
+const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
+
+const asset_path = path.join(root_path, '/Assets/')
 
 //path to config file
 const config_path = path.join(root_path, '/config.json')
+
+export const config = {}
+
+console.log('Config manager initialized')
 
 const configTemplate = {
     //list of all config variables and default values
@@ -142,6 +145,7 @@ config.device = (label) => {
 
     //no label found, create new from template
     const device = generateDevice(label)
+    console.log('Generating entry for new device: ', label)
     config.update({ devices:{ [device.label]: device } }, true)
     return device
 }
@@ -155,6 +159,8 @@ config.get = (path) => {
 }
 
 config.set = (path, value) => {
+    //TODO: figure out how the hell was this suppose to work according to past me
+    
     //travel the path backwards, starting from furthest branch of json tree
     let current = { [path.at(-1)]: isNaN(value) ? value : Number(value) }  
     for(let index = path.length - 2; index >= 0; index--) {
@@ -162,6 +168,8 @@ config.set = (path, value) => {
         current = { [path[index]]: current }
     }
     config.update(current, true)
+    
+    //config.update(update, true)
 }
 
 //check if config file status
@@ -178,10 +186,11 @@ if(fs.existsSync(config_path)){
 }
 
 //update filepaths in config to match current app location
-config.set(['mediapipe', 'PoseLandmarker', 'baseOptions', 'modelAssetPath'], path.join(root_path, '/Assets/task/', 'pose_landmarker.task'))
-config.set(['mediapipe', 'HandLandmarker', 'baseOptions', 'modelAssetPath'], path.join(root_path, '/Assets/task/', 'hand_landmarker.task'))
-config.set(['mediapipe', 'FaceLandmarker', 'baseOptions', 'modelAssetPath'], path.join(root_path, '/Assets/task/', 'face_landmarker.task'))
-config.set(['mediapipe', 'wasm'], path.join(root_path, '/Assets/task/', '/Assets/wasm/'))
+
+config.set(['mediapipe', 'PoseLandmarker', 'baseOptions', 'modelAssetPath'], path.join(asset_path, 'pose_landmarker.task'))
+config.set(['mediapipe', 'HandLandmarker', 'baseOptions', 'modelAssetPath'], path.join(asset_path, 'hand_landmarker.task'))
+config.set(['mediapipe', 'FaceLandmarker', 'baseOptions', 'modelAssetPath'], path.join(asset_path, 'face_landmarker.task'))
+config.set(['mediapipe', 'wasm'], path.join(asset_path, '/wasm/'))
 
 //returns status of hardware acceleration
 config.hwAcc = () => {
