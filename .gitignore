@@ -42,3 +42,5 @@ dist
 
 # custom app configuration
 config.json
+jsconfig.json
+.vscode/

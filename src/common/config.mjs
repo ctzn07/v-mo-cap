@@ -168,8 +168,6 @@ config.set = (path, value) => {
         current = { [path[index]]: current }
     }
     config.update(current, true)
-    
-    //config.update(update, true)
 }
 
 //check if config file status

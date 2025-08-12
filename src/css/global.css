@@ -91,3 +91,7 @@ a {
   scroll-snap-align: inherit;
   opacity: 0;
 }
+
+.device {
+  padding: var(--main-spacing);
+}

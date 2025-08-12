@@ -2,8 +2,8 @@
 import { useEffect, useState } from 'react'
 
 //override default console.log() with ../common/logger.mjs(see definition in preload script)
-//console.log = api.log
-console.error = api.error
+console.log = (msg) => api.send('logmessage', msg)
+console.error = (msg) => api.send('logerror', msg)
 
 //enumerate media devices with videoinput type
 function devicelist(callback){  
@@ -19,7 +19,6 @@ const getConfig = (path, callback) => {
     .catch(err => console.log(err))
 }
 
-let timegate = null //do not move, react wont like that
 
 function ModulePicker(props){
   //props.device
@@ -46,20 +45,42 @@ function ModulePicker(props){
 }
 
 function Device(device){
-  return <h1>{device.label}</h1>
+  
+
+  return <div className='device' key={'device_' + device.id} >{device.label}</div>
 }
 
+/* Device template(see deviceDataTemplate @ app.mjs line 18)
+{
+  label: string, 
+  id: string, 
+  active: boolean, 
+  modules: {
+    FaceLandmarker: boolean, 
+    Handlandmarker: boolean, 
+    Poselandmarker: boolean
+  }, 
+  performance: {
+    fps: number,
+    errors: number,
+  }
+}
+*/
+
+let timegate = null //do not declare inside component
 
 function Devices(props){
     const [devices, setDevices] = useState([])
 
     useEffect(() => {
-      const subscribe = () => {
+      const subscribe = (channel) => {
         //subscribe to UI update event
-        api.update((e, data) => {
-          //if update contains data about devices, set it to state
-          if(data.devices)setDevices(data.devices.map(d => { return Device(d) }))
+        api.subscribe(channel, (e, data) => {
+          //TODO: Sort devices by activity and name?
+          console.log(data)
+          setDevices(data.map(d => { return Device(d) }))
         })
+       
       }
 
       const cleanup = () => {
@@ -73,11 +94,11 @@ function Devices(props){
         //ondevicechange() triggers multiple times for some devices
         //use timeout to only trigger on last event
         clearTimeout(timegate)
-        timegate = setTimeout(() => devicelist((list) => api.devicelist(list)), 100)
+        timegate = setTimeout(() => devicelist((list) => api.send('devicelist', list)), 100)
       }
       
       //subscribe to UI updates
-      subscribe()
+      subscribe('device')
       //call initial update
       navigator.mediaDevices.ondevicechange()
 
@@ -88,19 +109,3 @@ function Devices(props){
 }
 
 export default Devices
-
-/** media device template
-  {
-    deviceId: '8e9d20f530d175ea8e1d03cca6ac55859c530c490973ffa1fd3f00efd808e76e',
-    kind: 'videoinput',
-    label: 'Logi C270 HD WebCam (046d:0825)',
-    groupId: 'adac2e907ff4797737755be47672aeca9178072fc272f5add682437b32339be1',
-    aspectRatio: { max: 1280, min: 0.0010416666666666667 },
-    facingMode: [],
-    frameRate: { max: 30, min: 1 },
-    height: { max: 960, min: 1 },
-    resizeMode: [ 'none', 'crop-and-scale' ],
-    width: { max: 1280, min: 1 },
-    status: 'available'
-  }
-*/
