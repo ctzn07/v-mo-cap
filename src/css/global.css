@@ -13,10 +13,11 @@ body {
   --main-spacing: 12px;
   --primary-color: #222222;
   --secondary-color: #333333;
-  --accent-color: #6ecc38;
+  --accent-color: #ffa826;
   --text-color: #f0ebeb;
   --border-radius: 5px;
   --tab-width: 64px;
+  --toggle-size: 32px;
 
   color-scheme: light dark;
   color: var(--text-color);
@@ -28,6 +29,7 @@ body {
   scroll-snap-type: y mandatory;
   scroll-snap-align: center;  
   margin: -3px;
+  padding: 0;
 }
 
 a {
@@ -43,18 +45,19 @@ a {
   font-weight: 500;
   font-size: large;
   box-sizing: border-box;
-  border: 1px dotted var(--accent-color);
+  border: 1px solid rgb(85, 85, 85);
+  /*border-radius: var(--border-radius);*/
 }
 
 .tab {
   float: left;
   background-color: transparent;
   position: fixed;
-  margin: var(--main-spacing);
-  height: calc(100% - (var(--main-spacing) * 2));
+  padding: var(--main-spacing);
+  height: 100%;
 }
 
-.tab button {
+button {
   display: block;
   background-color: inherit;
   color: var(--text-color);
@@ -63,15 +66,16 @@ a {
   border: none;
   outline: none;
   text-align: center;
-  width: var(--tab-width);
-  transition: 0.5s;
+  min-width: var(--tab-width);
+  transition: 0.2s;
 }
-.tab button:hover {
+
+button:hover {
   background-color: var(--secondary-color);
 }
 
 @keyframes fade {
-  40%, 60% {opacity: 0;}
+  45%, 55% {opacity: 0;}
   50% {opacity: 1;}
 }
 
@@ -82,16 +86,71 @@ a {
 
 .page {
   float: right;
-  padding: 0px 12px;
-  width: calc(100% - (var(--tab-width) + var(--main-spacing) * 3));
-  height: calc(100vh - var(--main-spacing) * 2);
-  margin: var(--main-spacing);
+  width: calc(100% - (var(--tab-width) + var(--main-spacing) * 2));
+  height: 100vh;
   scroll-behavior: inherit;
   scroll-snap-type: inherit;
   scroll-snap-align: inherit;
   opacity: 0;
+  overflow: auto;
+  padding: var(--main-spacing);
 }
 
 .device {
-  padding: var(--main-spacing);
+  display: flex;
+  min-height: var(--tab-width);
+  height: fit-content;
+  overflow: hidden;
+  border: solid 1px var(--accent-color);
+  vertical-align: text-top;
+  text-wrap: nowrap;
+}
+
+.device h1 {
+  font-size: 20px;
+}
+
+/*checkbox*/
+.switch {
+  display: inline-block;
+  position: relative;
+  width: var(--toggle-size);
+  height: calc(var(--toggle-size) / 2);
+  border: none;
+}
+/*checkbox content*/
+.switch input { 
+  display: none;
+}
+
+/*background*/
+.slider {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background-color: var(--primary-color);
+  border: solid 1px var(--secondary-color);
+  border-radius: var(--border-radius);
+  transition: linear .2s;
+}
+
+/*slider knob*/
+.slider:before {
+  position: absolute;
+  left: 0;
+  content: "";
+  height: 100%;
+  width: 50%;
+  background-color: var(--accent-color);
+  border-radius: var(--border-radius);
+  transition: linear .2s;
+  margin: -1px;
+}
+
+input:checked + .slider {
+  background-color: var(--secondary-color);
+}
+
+input:checked + .slider:before {
+  transform: translateX(100%);
 }

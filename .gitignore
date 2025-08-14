@@ -44,3 +44,6 @@ dist
 config.json
 jsconfig.json
 .vscode/
+
+# ignored assets
+src/Font/*

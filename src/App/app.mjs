@@ -11,6 +11,7 @@ class IPCEmitter extends EventEmitter {}
 const ipcRender = new IPCEmitter()
 
 const devices = []
+const trackers = new Map()
 //helper function to send data to UI
 function updateUI(channel, data){ ipcRender.emit(channel, data) }
 
@@ -20,7 +21,7 @@ function updateDevices(list){ //receives a device list in browser format
     return {
       label: c.label, 
       id: c.deviceId, 
-      active: false, //todo: does device have active connection
+      active: trackers.has(c.label), //does device have active connection
       modules: c.modules, 
       performance: {
         fps: 0, //todo: make system that monitors performance
@@ -28,15 +29,40 @@ function updateDevices(list){ //receives a device list in browser format
       }
     }
   }
-  //clear existing data
-  devices.length = 0
+  
+  if(list){
+    //if list argument was provided, clear the existing data
+    devices.length = 0
 
-  //for each device in list, fetch config data for it, then format it for UI
-  for(const d of list){ devices.push(deviceDataTemplate(config.device(d.label)))}
-
+    //for each device in list, fetch config data for it, then format it for UI
+    for(const d of list){ devices.push(deviceDataTemplate(config.device(d.label)))}
+  }
+  else{
+    //no list argument provided, refresh existing list
+    for(const [i, d] of devices.entries()){  
+      devices[i] = deviceDataTemplate(config.device(d.label)) 
+      //console.log('index', i, d.label, d.active)
+    }
+  }
+  console.log('current trackers:', ...trackers.keys())
   updateUI('device', devices)
 }
 
+function trackerConnect(device){
+  //console.log('connect: ', device)
+  const connect = (d) => {
+    console.log('creating tracker for ', d.label)
+    //TODO: create new tracker instance
+    trackers.set(d.label, 'INSERT WS CONNECTION HERE')
+  }
+  const disconnect = (d) => {
+    //TODO: bind this function to ws disconnection event
+    console.log('disconnecting tracker for ', d.label)
+    trackers.delete(d.label)
+  }
+  trackers.has(device.label) ? disconnect(device) : connect(device)
+  updateDevices() //device update is ran here for UI responsivenes
+}
 
 function createGUI(){
   const win = new BrowserWindow({
@@ -63,7 +89,7 @@ function createGUI(){
 
   //Events for receiving data from UI
   ipcMain.on('devicelist', (e, list) => { updateDevices(list) })
-  ipcMain.on('connect', (e, device) => console.log('connect: ', device))
+  ipcMain.on('connect', (e, device) => trackerConnect(device))
   ipcMain.on('setconfig', (e, path, value) => console.log('setconfig: ', value, path))
 
   //Data requests events from UI

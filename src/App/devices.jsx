@@ -1,9 +1,10 @@
 //Device list component
 import { useEffect, useState } from 'react'
+import { ToggleButton, DeviceStatusText } from './gui_library'
 
-//override default console.log() with ../common/logger.mjs(see definition in preload script)
-console.log = (msg) => api.send('logmessage', msg)
-console.error = (msg) => api.send('logerror', msg)
+//override default console.log() with ../common/logger.mjs
+//console.log = (msg) => api.send('logmessage', msg)
+//console.error = (msg) => api.send('logerror', msg)
 
 //enumerate media devices with videoinput type
 function devicelist(callback){  
@@ -19,35 +20,21 @@ const getConfig = (path, callback) => {
     .catch(err => console.log(err))
 }
 
-
-function ModulePicker(props){
-  //props.device
-  const [modules, setModules] = useState({})
-
-  const deviceUpdate = (label, module, value) => {
-    api.setconfig({ devices: { [label]: { modules: { [module]: value } } } })
-    getConfig(['devices', props.device.label, 'modules'], setModules)
-  }
-
-  //get initial config values
-  useEffect(() => getConfig(['devices', props.device.label, 'modules'], setModules), [])
-  
-  
-    return (
-    <button  key={'mod' + i} 
-      onClick={() => deviceUpdate(props.device.label, mod, !modules[mod])} >
-      {module_map.get(mod)}
-      <input type='checkbox' checked={modules[mod]} readOnly={true} />
-    </button>
-    )
-  
-  return buttons
-}
-
 function Device(device){
-  
-
-  return <div className='device' key={'device_' + device.id} >{device.label}</div>
+  return <div 
+    className='device' 
+    key={'device_' + device.id} >
+      <ToggleButton labels={['On', 'Off']} active={device.active} callback={() => api.send('connect', device)} />
+      <div style={{marginRight: 'auto', marginLeft: '0px', display: 'block', width: '100%', overflow: 'hidden'}}>
+        {device.label}<br/>
+        {device.active ? <DeviceStatusText device={device}/> : null}
+      </div>
+      <div style={{marginRight: '0px', marginLeft: 'auto', display: 'flex'}}>
+        <ToggleButton labels={['Face']} active={device.modules.FaceLandmarker} callback={() => console.log('face')} />
+        <ToggleButton labels={['Hand']} active={device.modules.Handlandmarker} callback={() => console.log('hand')} />
+        <ToggleButton labels={['Pose']} active={device.modules.Poselandmarker} callback={() => console.log('pose')} />
+      </div>
+    </div>
 }
 
 /* Device template(see deviceDataTemplate @ app.mjs line 18)
@@ -77,7 +64,7 @@ function Devices(props){
         //subscribe to UI update event
         api.subscribe(channel, (e, data) => {
           //TODO: Sort devices by activity and name?
-          console.log(data)
+          //console.log(data)
           setDevices(data.map(d => { return Device(d) }))
         })
        
