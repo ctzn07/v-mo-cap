@@ -12,7 +12,7 @@ body {
 :root {
   --main-spacing: 12px;
   --primary-color: #222222;
-  --secondary-color: #333333;
+  --secondary-color: #4e4e4e;
   --accent-color: #ffa826;
   --text-color: #f0ebeb;
   --border-radius: 5px;
@@ -45,7 +45,7 @@ a {
   font-weight: 500;
   font-size: large;
   box-sizing: border-box;
-  border: 1px solid rgb(85, 85, 85);
+  border: 0px solid rgb(163, 163, 163);
   /*border-radius: var(--border-radius);*/
 }
 
@@ -59,15 +59,17 @@ a {
 
 button {
   display: block;
-  background-color: inherit;
   color: var(--text-color);
   background-color: var(--primary-color);
   aspect-ratio: 1;
-  border: none;
   outline: none;
   text-align: center;
+
   min-width: var(--tab-width);
+  max-width: var(--tab-width);
+
   transition: 0.2s;
+  border-radius: var(--border-radius);
 }
 
 button:hover {
@@ -101,13 +103,22 @@ button:hover {
   min-height: var(--tab-width);
   height: fit-content;
   overflow: hidden;
-  border: solid 1px var(--accent-color);
+  border-bottom: solid 1px var(--secondary-color);
   vertical-align: text-top;
   text-wrap: nowrap;
+  margin-bottom: var(--main-spacing);
+  border-radius: var(--border-radius);
+  padding: var(--main-spacing);
+  padding-top: calc(var(--main-spacing) * 2);
+  position: relative;
 }
 
-.device h1 {
+.device_label {
+  position: absolute;
+  top: calc(var(--main-spacing) / 2);
   font-size: 20px;
+  border: 0px solid rgb(212, 0, 0);
+  z-index: 2;
 }
 
 /*checkbox*/
@@ -115,9 +126,10 @@ button:hover {
   display: inline-block;
   position: relative;
   width: var(--toggle-size);
-  height: calc(var(--toggle-size) / 2);
+  aspect-ratio: 3;
   border: none;
 }
+
 /*checkbox content*/
 .switch input { 
   display: none;
@@ -131,7 +143,7 @@ button:hover {
   background-color: var(--primary-color);
   border: solid 1px var(--secondary-color);
   border-radius: var(--border-radius);
-  transition: linear .2s;
+  transition: linear .1s;
 }
 
 /*slider knob*/
@@ -140,17 +152,26 @@ button:hover {
   left: 0;
   content: "";
   height: 100%;
-  width: 50%;
   background-color: var(--accent-color);
   border-radius: var(--border-radius);
-  transition: linear .2s;
-  margin: -1px;
+  /*animated properties*/
+  opacity: 0;
+  width: 0%;
+  box-shadow: none;
+  transition: .2s;
 }
-
+/* background color change when toggled on
 input:checked + .slider {
   background-color: var(--secondary-color);
 }
-
+*/
 input:checked + .slider:before {
-  transform: translateX(100%);
+  opacity: 1;
+  width: 100%;
+  box-shadow: 0 0 10px var(--accent-color);
+}
+
+.status_text {
+  overflow: hidden;
+  border-bottom: 1px solid var(--secondary-color);
 }

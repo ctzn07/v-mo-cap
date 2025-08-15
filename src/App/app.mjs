@@ -24,8 +24,18 @@ function updateDevices(list){ //receives a device list in browser format
       active: trackers.has(c.label), //does device have active connection
       modules: c.modules, 
       performance: {
-        fps: 0, //todo: make system that monitors performance
-        errors: 0, //todo: make system that monitors tracking errors
+        fps: {
+          label: 'Framerate', 
+          value: 5, 
+          min: 0, 
+          max: 30, 
+          unit:'fps'},  //todo: make system that monitors performance
+        error: {
+          label: 'Accuracy', 
+          value: 0, 
+          min: 0, 
+          max: 100, 
+          unit:'%'}, //todo: make system that monitors tracking errors
       }
     }
   }
@@ -64,6 +74,11 @@ function trackerConnect(device){
   updateDevices() //device update is ran here for UI responsivenes
 }
 
+function setConfig(path, value){
+  config.set(path, value)
+  updateDevices()
+}
+
 function createGUI(){
   const win = new BrowserWindow({
     width: 1000,
@@ -90,7 +105,7 @@ function createGUI(){
   //Events for receiving data from UI
   ipcMain.on('devicelist', (e, list) => { updateDevices(list) })
   ipcMain.on('connect', (e, device) => trackerConnect(device))
-  ipcMain.on('setconfig', (e, path, value) => console.log('setconfig: ', value, path))
+  ipcMain.on('setconfig', (e, path, value) => setConfig(path, value))
 
   //Data requests events from UI
   ipcMain.handle('getconfig', (e, path) => { return config.get(path) })

@@ -18,5 +18,16 @@ export function ToggleButton({ labels, active, callback }){
 }
 
 export function DeviceStatusText({ device }){
-    return Object.keys(device.performance).map((entry, index) => {return (<div key={device.id + '_statusText_' + index}>{entry + ':' + device.performance[entry]}<br/></div>)})
+    const statusObjects = Object.keys(device.performance).map(k => device.performance[k])
+    console.log(statusObjects)
+
+    return statusObjects.map((s, i) => {
+        return <div key={device.id + '_statusText_' + i} className='status_text' >
+                    <div style={{display:'flex', minWidth: '100px', fontSize: 'small'}} >{'- ' + s.label}
+                        <div style={{width:'100%', textAlign: 'right', fontSize: 'small'}}>{s.value}</div>
+                        <div style={{minWidth: '20px', textAlign: 'left', fontSize: 'small'}}>{s.unit}</div>
+                    </div>
+                </div>
+    })
 }
+//<div style={{display: 'flex'}} >{s.label}<div style={{width: '100%', textAlign:'right'}}>{s.value + ' ' + s.unit}</div>

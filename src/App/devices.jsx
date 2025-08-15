@@ -24,18 +24,20 @@ function Device(device){
   return <div 
     className='device' 
     key={'device_' + device.id} >
+      <div className='device_label'>{device.label}</div>
       <ToggleButton labels={['On', 'Off']} active={device.active} callback={() => api.send('connect', device)} />
-      <div style={{marginRight: 'auto', marginLeft: '0px', display: 'block', width: '100%', overflow: 'hidden'}}>
-        {device.label}<br/>
+      <div style={{marginRight: 'auto', marginLeft: '15px', display: 'block', width: '100%', overflow: 'hidden'}}>
+        <br/>
         {device.active ? <DeviceStatusText device={device}/> : null}
       </div>
       <div style={{marginRight: '0px', marginLeft: 'auto', display: 'flex'}}>
-        <ToggleButton labels={['Face']} active={device.modules.FaceLandmarker} callback={() => console.log('face')} />
-        <ToggleButton labels={['Hand']} active={device.modules.Handlandmarker} callback={() => console.log('hand')} />
-        <ToggleButton labels={['Pose']} active={device.modules.Poselandmarker} callback={() => console.log('pose')} />
+        <ToggleButton labels={['Face']} active={device.modules.FaceLandmarker} callback={(bool) => api.send('setconfig', ['devices', device.label, 'modules', 'FaceLandmarker'], bool)} />
+        <ToggleButton labels={['Hand']} active={device.modules.HandLandmarker} callback={(bool) => api.send('setconfig', ['devices', device.label, 'modules', 'HandLandmarker'], bool)} />
+        <ToggleButton labels={['Pose']} active={device.modules.PoseLandmarker} callback={(bool) => api.send('setconfig', ['devices', device.label, 'modules', 'PoseLandmarker'], bool)} />
       </div>
     </div>
 }
+//ipcMain.on('setconfig', (e, path, value) => console.log('setconfig: ', value, path))
 
 /* Device template(see deviceDataTemplate @ app.mjs line 18)
 {
