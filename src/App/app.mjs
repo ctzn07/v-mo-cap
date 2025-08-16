@@ -23,7 +23,7 @@ function updateDevices(list){ //receives a device list in browser format
       id: c.deviceId, 
       active: trackers.has(c.label), //does device have active connection
       modules: c.modules, 
-      performance: {
+      status: {
         fps: {
           label: 'Framerate', 
           value: 5, 
@@ -43,18 +43,13 @@ function updateDevices(list){ //receives a device list in browser format
   if(list){
     //if list argument was provided, clear the existing data
     devices.length = 0
-
     //for each device in list, fetch config data for it, then format it for UI
     for(const d of list){ devices.push(deviceDataTemplate(config.device(d.label)))}
   }
   else{
     //no list argument provided, refresh existing list
-    for(const [i, d] of devices.entries()){  
-      devices[i] = deviceDataTemplate(config.device(d.label)) 
-      //console.log('index', i, d.label, d.active)
-    }
+    devices.forEach((d, i) => devices[i] = deviceDataTemplate(config.device(d.label)))
   }
-  console.log('current trackers:', ...trackers.keys())
   updateUI('device', devices)
 }
 

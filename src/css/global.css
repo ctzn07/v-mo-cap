@@ -13,7 +13,7 @@ body {
   --main-spacing: 12px;
   --primary-color: #222222;
   --secondary-color: #4e4e4e;
-  --accent-color: #ffa826;
+  --accent-color: #ffa126;
   --text-color: #f0ebeb;
   --border-radius: 5px;
   --tab-width: 64px;
@@ -107,7 +107,7 @@ button:hover {
   vertical-align: text-top;
   text-wrap: nowrap;
   margin-bottom: var(--main-spacing);
-  border-radius: var(--border-radius);
+  /*border-radius: var(--border-radius);*/
   padding: var(--main-spacing);
   padding-top: calc(var(--main-spacing) * 2);
   position: relative;

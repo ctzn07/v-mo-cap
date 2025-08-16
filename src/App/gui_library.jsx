@@ -18,7 +18,7 @@ export function ToggleButton({ labels, active, callback }){
 }
 
 export function DeviceStatusText({ device }){
-    const statusObjects = Object.keys(device.performance).map(k => device.performance[k])
+    const statusObjects = Object.keys(device.status).map(k => device.status[k])
     console.log(statusObjects)
 
     return statusObjects.map((s, i) => {
@@ -30,4 +30,29 @@ export function DeviceStatusText({ device }){
                 </div>
     })
 }
-//<div style={{display: 'flex'}} >{s.label}<div style={{width: '100%', textAlign:'right'}}>{s.value + ' ' + s.unit}</div>
+/* Device template(see deviceDataTemplate @ app.mjs line 18)
+{
+  label: string, 
+  id: string, 
+  active: boolean, 
+  modules: {
+    FaceLandmarker: boolean, 
+    Handlandmarker: boolean, 
+    Poselandmarker: boolean
+  }, 
+  status: {
+        fps: {
+          label: 'Framerate', 
+          value: 5, 
+          min: 0, 
+          max: 30, 
+          unit:'fps'},  //todo: make system that monitors performance
+        error: {
+          label: 'Accuracy', 
+          value: 0, 
+          min: 0, 
+          max: 100, 
+          unit:'%'}, //todo: make system that monitors tracking errors
+      }
+}
+*/

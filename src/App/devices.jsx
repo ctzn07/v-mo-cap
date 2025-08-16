@@ -26,8 +26,7 @@ function Device(device){
     key={'device_' + device.id} >
       <div className='device_label'>{device.label}</div>
       <ToggleButton labels={['On', 'Off']} active={device.active} callback={() => api.send('connect', device)} />
-      <div style={{marginRight: 'auto', marginLeft: '15px', display: 'block', width: '100%', overflow: 'hidden'}}>
-        <br/>
+      <div style={{paddingLeft: 'inherit', paddingRight: 'inherit', display: 'block', width: '100%', overflow: 'hidden'}}>
         {device.active ? <DeviceStatusText device={device}/> : null}
       </div>
       <div style={{marginRight: '0px', marginLeft: 'auto', display: 'flex'}}>
@@ -38,23 +37,6 @@ function Device(device){
     </div>
 }
 //ipcMain.on('setconfig', (e, path, value) => console.log('setconfig: ', value, path))
-
-/* Device template(see deviceDataTemplate @ app.mjs line 18)
-{
-  label: string, 
-  id: string, 
-  active: boolean, 
-  modules: {
-    FaceLandmarker: boolean, 
-    Handlandmarker: boolean, 
-    Poselandmarker: boolean
-  }, 
-  performance: {
-    fps: number,
-    errors: number,
-  }
-}
-*/
 
 let timegate = null //do not declare inside component
 

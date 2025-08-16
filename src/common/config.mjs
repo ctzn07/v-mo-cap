@@ -159,18 +159,13 @@ config.get = (path) => {
 }
 
 config.set = (path, value) => {
-    //TODO: figure out how the hell was this suppose to work according to past me
-    
-    //BUG: Booleans are getting converted to numbers
-
-    //travel the path backwards, starting from furthest branch of json tree
-    let current = { [path.at(-1)]: isNaN(value) ? value : Number(value) }  
-    for(let index = path.length - 2; index >= 0; index--) {
-        //wrap json branch recursively
-        current = { [path[index]]: current }
-    }
+    //travel the path backwards, starting from furthest branch of json tree  
+    let current = { [path.at(-1)]: value }
+    //recursive branch wrap
+    for(let i = path.length - 2; i >= 0; i--){ current = { [path[i]]: current } }
     config.update(current, true)
 }
+//let current = { [path.at(-1)]: isNaN(value) ? value : Number(value) }
 
 //check if config file status
 if(fs.existsSync(config_path)){
