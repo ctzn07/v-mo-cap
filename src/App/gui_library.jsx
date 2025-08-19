@@ -1,12 +1,9 @@
-import { useEffect, useState } from 'react'
-
 const style = window.getComputedStyle(document.body)
 //style.getPropertyValue('value name')
 const primary_color = style.getPropertyValue('--primary-color')
 const secondary_color = style.getPropertyValue('--secondary-color')
 
 export function ToggleButton({ labels, active, callback }){
-    //const [value, setValue] = useState(values[0])
     return <button 
         onClick={e => { e.preventDefault(); callback(!active) }}>
         {active ? labels[0] : labels[1] ? labels[1] : labels[0]}<br/>
@@ -17,11 +14,12 @@ export function ToggleButton({ labels, active, callback }){
     </button>
 }
 
-export function DeviceStatusText({ device }){
-    const statusObjects = Object.keys(device.status).map(k => device.status[k])
-    console.log(statusObjects)
+//TODO: see
+//https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/meter
+//https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/progress
 
-    return statusObjects.map((s, i) => {
+export function DeviceStatusText({ device }){
+    return device.status.map((s, i) => {
         return <div key={device.id + '_statusText_' + i} className='status_text' >
                     <div style={{display:'flex', minWidth: '100px', fontSize: 'small'}} >{'- ' + s.label}
                         <div style={{width:'100%', textAlign: 'right', fontSize: 'small'}}>{s.value}</div>
@@ -30,7 +28,7 @@ export function DeviceStatusText({ device }){
                 </div>
     })
 }
-/* Device template(see deviceDataTemplate @ app.mjs line 18)
+/* Device template(see deviceDataTemplate @ app.mjs line 21)
 {
   label: string, 
   id: string, 
@@ -55,4 +53,45 @@ export function DeviceStatusText({ device }){
           unit:'%'}, //todo: make system that monitors tracking errors
       }
 }
+*/
+
+export function ConfigField({ label, children }){
+    return <div className='component' >
+        <div className="component_label" >{label}</div>
+        <div style={{display: 'block', paddingLeft: 'inherit', paddingRight: 'inherit', width: '100%'}} >{children}</div>
+    </div>
+}
+
+export function ConfigEntry({ name, type, value, callback }){
+    switch (type) {
+        case 'range':
+            return <div style={{paddingTop: '8px', display: 'flex'}}>
+                {name}<div style={{float: 'right'}}></div>
+                    <input 
+                        type="range" 
+                        min={0} 
+                        max={1} 
+                        step={0.05} 
+                        value={value} 
+                        onChange={e => callback(Number(e.target.value))} 
+                    />
+            </div>
+        case 'select':
+            return <div>
+                {'select placeholder'}
+            </div>
+    
+        default:
+            return null
+    }
+}
+/*
+<input type="range" min="0" max="1" step="0.1">
+
+<select>
+    <option value="1">1</option>
+    <option value="2">2</option>
+</select>
+
+
 */

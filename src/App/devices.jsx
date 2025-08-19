@@ -14,29 +14,23 @@ function devicelist(callback){
     .catch(e => console.error(e))
 }
 
-const getConfig = (path, callback) => {
-  api.getconfig(path)
-    .then(data => callback(data))
-    .catch(err => console.log(err))
-}
-
 function Device(device){
   return <div 
-    className='device' 
+    className='component' 
     key={'device_' + device.id} >
-      <div className='device_label'>{device.label}</div>
+      <div className='component_label' onClick={() => {}} >{device.label}</div>
       <ToggleButton labels={['On', 'Off']} active={device.active} callback={() => api.send('connect', device)} />
       <div style={{paddingLeft: 'inherit', paddingRight: 'inherit', display: 'block', width: '100%', overflow: 'hidden'}}>
         {device.active ? <DeviceStatusText device={device}/> : null}
       </div>
-      <div style={{marginRight: '0px', marginLeft: 'auto', display: 'flex'}}>
+      <div style={{display: 'flex'}}>
         <ToggleButton labels={['Face']} active={device.modules.FaceLandmarker} callback={(bool) => api.send('setconfig', ['devices', device.label, 'modules', 'FaceLandmarker'], bool)} />
         <ToggleButton labels={['Hand']} active={device.modules.HandLandmarker} callback={(bool) => api.send('setconfig', ['devices', device.label, 'modules', 'HandLandmarker'], bool)} />
-        <ToggleButton labels={['Pose']} active={device.modules.PoseLandmarker} callback={(bool) => api.send('setconfig', ['devices', device.label, 'modules', 'PoseLandmarker'], bool)} />
+        <ToggleButton labels={['Body']} active={device.modules.PoseLandmarker} callback={(bool) => api.send('setconfig', ['devices', device.label, 'modules', 'PoseLandmarker'], bool)} />
       </div>
     </div>
 }
-//ipcMain.on('setconfig', (e, path, value) => console.log('setconfig: ', value, path))
+//changing display: 'block' (line 26) changes toggle buttons to vertical
 
 let timegate = null //do not declare inside component
 
@@ -46,18 +40,15 @@ function Devices(props){
     useEffect(() => {
       const subscribe = (channel) => {
         //subscribe to UI update event
-        api.subscribe(channel, (e, data) => {
-          //TODO: Sort devices by activity and name?
-          //console.log(data)
-          setDevices(data.map(d => { return Device(d) }))
+        api.subscribe(channel, (e, data) => { 
+          setDevices(data.map(d => { return Device(d) })) 
         })
-       
       }
 
       const cleanup = () => {
         clearTimeout(timegate)
         navigator.mediaDevices.ondevicechange = null
-        api.unsubscribe('update', subscribe)
+        api.unsubscribe('device', subscribe)
       }
 
       //Device change event
@@ -67,11 +58,8 @@ function Devices(props){
         clearTimeout(timegate)
         timegate = setTimeout(() => devicelist((list) => api.send('devicelist', list)), 100)
       }
-      
-      //subscribe to UI updates
-      subscribe('device')
-      //call initial update
-      navigator.mediaDevices.ondevicechange()
+      subscribe('device') //subscribe to device updates
+      navigator.mediaDevices.ondevicechange() //call initial update
 
       return cleanup
     }, [])

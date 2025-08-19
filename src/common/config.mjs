@@ -159,11 +159,17 @@ config.get = (path) => {
 }
 
 config.set = (path, value) => {
-    //travel the path backwards, starting from furthest branch of json tree  
-    let current = { [path.at(-1)]: value }
-    //recursive branch wrap
-    for(let i = path.length - 2; i >= 0; i--){ current = { [path[i]]: current } }
-    config.update(current, true)
+    if(path.length && value){
+        //travel the path backwards, starting from furthest branch of json tree  
+        let current = { [path.at(-1)]: value }
+        //recursive branch wrap
+        for(let i = path.length - 2; i >= 0; i--){ current = { [path[i]]: current } }
+        config.update(current, true)
+    }
+    else{
+        console.error('Empty path or value for config.set')
+    }
+    
 }
 //let current = { [path.at(-1)]: isNaN(value) ? value : Number(value) }
 

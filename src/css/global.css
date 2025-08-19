@@ -45,7 +45,7 @@ a {
   font-weight: 500;
   font-size: large;
   box-sizing: border-box;
-  border: 0px solid rgb(163, 163, 163);
+  border: 1px solid rgb(163, 163, 163);
   /*border-radius: var(--border-radius);*/
 }
 
@@ -98,7 +98,7 @@ button:hover {
   padding: var(--main-spacing);
 }
 
-.device {
+.component {
   display: flex;
   min-height: var(--tab-width);
   height: fit-content;
@@ -113,11 +113,10 @@ button:hover {
   position: relative;
 }
 
-.device_label {
+.component_label {
   position: absolute;
   top: calc(var(--main-spacing) / 2);
   font-size: 20px;
-  border: 0px solid rgb(212, 0, 0);
   z-index: 2;
 }
 
