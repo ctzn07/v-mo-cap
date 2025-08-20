@@ -3,6 +3,9 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import EventEmitter from 'node:events'
 import { console } from '../common/logger.mjs'
 import { config } from '../common/config.mjs'
+import { gui } from './gui.mjs'
+import { tracker } from './trackers.mjs'
+
 import { isDev, platform } from '../common/util.mjs'
 
 import path from 'path'
@@ -10,186 +13,14 @@ import path from 'path'
 class IPCEmitter extends EventEmitter {}
 const ipcRender = new IPCEmitter()
 
-const devices = []
-const trackers = new Map()
 //helper function to send data to UI
-function updateUI(channel, data){ ipcRender.emit(channel, data) }
+function updateUI(channel, data = null){
+  const map = new Map()
+    .set('device', (a) => gui.devices(a))
+    .set('config', (a) => gui.config(a))
 
-function updateDevices(list){ //receives a device list in browser format
-  const deviceDataTemplate = (c) => {
-    //formats the device config data for UI
-    return {
-      label: c.label, 
-      id: c.deviceId, 
-      active: trackers.has(c.label), //does device have active connection
-      modules: c.modules, 
-      status: [
-        { //todo: make system that monitors performance
-          label: 'Framerate', 
-          value: 5, 
-          min: 0, 
-          max: 30, 
-          unit:'fps'
-        }, 
-        { //todo: make system that monitors tracking errors
-          label: 'Accuracy', 
-          value: 0, 
-          min: 0, 
-          max: 100, 
-          unit:'%'
-        }, 
-      ]
-    }
-  }
-
-  if(list){
-    //if list argument was provided, clear the existing data
-    devices.length = 0
-    //for each device in list, fetch config data for it, then format it for UI
-    for(const d of list){ devices.push(deviceDataTemplate(config.device(d.label), trackers))}
-  }
-  else{
-    //no list argument provided, refresh existing list
-    devices.forEach((d, i) => devices[i] = deviceDataTemplate(config.device(d.label)))
-  }
-  updateUI('device', devices)
-}
-
-function trackerConnect(device){
-  //console.log('connect: ', device)
-  const connect = (d) => {
-    console.log('creating tracker for ', d.label)
-    //TODO: create new tracker instance
-    trackers.set(d.label, 'INSERT WS CONNECTION HERE')
-  }
-  const disconnect = (d) => {
-    //TODO: bind this function to ws disconnection event
-    console.log('disconnecting tracker for ', d.label)
-    trackers.delete(d.label)
-  }
-  trackers.has(device.label) ? disconnect(device) : connect(device)
-  updateDevices() //device update is ran here for UI responsivenes
-}
-
-function updateConfig(){
-  const configDataTemplate = () => {
-    //formats config options for the UI
-    return [
-      {
-        label: 'User settings', 
-        options: [
-          {
-            label: 'Websocket port', 
-            path: ['user', 'tracker_port'], 
-            type: ['select', 443, 8080], 
-            value: config.get(['user', 'tracker_port'])
-          }, 
-          {
-            label: 'Preferred GPU', 
-            path: ['user', 'preferredGPU'], 
-            type: ['select', 'dGPU', 'iGPU'], 
-            value: config.get(['user', 'preferredGPU'])
-          }, 
-        ]
-      },
-      {
-        label: 'Face tracking', 
-        options: [
-          {
-            label: 'Detection confidence', 
-            path: ['mediapipe', 'FaceLandmarker', 'minFaceDetectionConfidence'], 
-            type: ['range', 0, 1], 
-            value: config.get(['mediapipe', 'FaceLandmarker', 'minFaceDetectionConfidence'])
-          }, 
-          {
-            label: 'Presence confidence', 
-            path: ['mediapipe', 'FaceLandmarker', 'minFacePresenceConfidence'], 
-            type: ['range', 0, 1], 
-            value: config.get(['mediapipe', 'FaceLandmarker', 'minFacePresenceConfidence'])
-          }, 
-          {
-            label: 'Tracking confidence', 
-            path: ['mediapipe', 'FaceLandmarker', 'minTrackingConfidence'], 
-            type: ['range', 0, 1], 
-            value: config.get(['mediapipe', 'FaceLandmarker', 'minTrackingConfidence'])
-          }, 
-          {
-            label: 'Detection hardware', 
-            path: ['mediapipe', 'FaceLandmarker', 'baseOptions', 'delegate'], 
-            type: ['select', 'GPU', 'CPU'], 
-            value: config.get(['mediapipe', 'FaceLandmarker', 'baseOptions', 'delegate'])
-          }, 
-        ]
-      }, 
-      {
-        label: 'Hand tracking', 
-        options: [
-          {
-            label: 'Detection confidence', 
-            path: ['mediapipe', 'HandLandmarker', 'minHandDetectionConfidence'], 
-            type: ['range', 0, 1], 
-            value: config.get(['mediapipe', 'HandLandmarker', 'minHandDetectionConfidence'])
-          }, 
-          {
-            label: 'Presence confidence', 
-            path: ['mediapipe', 'HandLandmarker', 'minHandPresenceConfidence'], 
-            type: ['range', 0, 1], 
-            value: config.get(['mediapipe', 'HandLandmarker', 'minHandPresenceConfidence'])
-          }, 
-          {
-            label: 'Tracking confidence', 
-            path: ['mediapipe', 'HandLandmarker', 'minTrackingConfidence'], 
-            type: ['range', 0, 1], 
-            value: config.get(['mediapipe', 'HandLandmarker', 'minTrackingConfidence'])
-          }, 
-          {
-            label: 'Detection hardware', 
-            path: ['mediapipe', 'HandLandmarker', 'baseOptions', 'delegate'], 
-            type: ['select', 'GPU', 'CPU'], 
-            value: config.get(['mediapipe', 'HandLandmarker', 'baseOptions', 'delegate'])
-          }, 
-        ]
-      }, 
-      {
-        label: 'Body tracking', 
-        options: [
-          {
-            label: 'Detection confidence', 
-            path: ['mediapipe', 'PoseLandmarker', 'minPoseDetectionConfidence'], 
-            type: ['range', 0, 1], 
-            value: config.get(['mediapipe', 'PoseLandmarker', 'minPoseDetectionConfidence'])
-          }, 
-          {
-            label: 'Presence confidence', 
-            path: ['mediapipe', 'PoseLandmarker', 'minPosePresenceConfidence'], 
-            type: ['range', 0, 1], 
-            value: config.get(['mediapipe', 'PoseLandmarker', 'minPosePresenceConfidence'])
-          }, 
-          {
-            label: 'Tracking confidence', 
-            path: ['mediapipe', 'PoseLandmarker', 'minTrackingConfidence'], 
-            type: ['range', 0, 1], 
-            value: config.get(['mediapipe', 'PoseLandmarker', 'minTrackingConfidence'])
-          }, 
-          {
-            label: 'Detection hardware', 
-            path: ['mediapipe', 'PoseLandmarker', 'baseOptions', 'delegate'], 
-            type: ['select', 'GPU', 'CPU'], 
-            value: config.get(['mediapipe', 'PoseLandmarker', 'baseOptions', 'delegate'])
-          }, 
-        ]
-      }
-    ]
-  }
-
-  const data = configDataTemplate()
-  updateUI('config', data)
-}
-
-function setConfig(path, value){
-  config.set(path, value)
-  updateDevices()
-  //updateConfig()
+  const callback = map.get(channel)
+  ipcRender.emit(channel, callback(data)) 
 }
 
 function createGUI(){
@@ -215,10 +46,16 @@ function createGUI(){
   ipcRender.on('config', (data) => win.webContents.send('config', data))
   ipcRender.on('preview', (data) => win.webContents.send('preview', data))
 
+  //config manager update events(channels correspond each config.json branch)
+  config.update.on('devices', () => updateUI('device'))
+  config.update.on('mediapipe', () => updateUI('config'))
+  config.update.on('user', () => updateUI('config'))
+
   //Events for receiving data from UI
-  ipcMain.on('devicelist', (e, list) => updateDevices(list))
-  ipcMain.on('connect', (e, device) => trackerConnect(device))
-  ipcMain.on('setconfig', (e, path, value) => setConfig(path, value))
+  ipcMain.on('devicelist', (e, list) => updateUI('device', list))
+  ipcMain.on('connect', (e, device) => { tracker.toggle(device); updateUI('device') })
+  ipcMain.on('setconfig', (e, path, value) => config.set(path, value))
+  ipcMain.on('update-request', (e, channel) => updateUI(channel))
 
   //Data requests events from UI
   ipcMain.handle('getconfig', (e, path) => { return config.get(path) })
@@ -227,7 +64,6 @@ function createGUI(){
   ipcMain.on('logmessage', (e, msg) => console.log(msg))
   ipcMain.on('logerror', (e, msg) => console.error(msg))
 }
-
 
 //initialization script
 export default function initApp(args){

@@ -16,13 +16,15 @@ function Config(props){
         }
 
         const cleanup = () => { api.unsubscribe('config', subscribe) }
-
-        subscribe('config') //subscribe to config updates
-        //api.send('setconfig', [], null) //call initial update
+        
+        //subscribe to config updates
+        subscribe('config')
+        //call initial update
+        api.send('update-request', 'config')
 
         return cleanup
     }, [])
-
+    
     //return (<div className={'page anim_fade'} id={props.id} >{configs}</div>)
     return <div className={'page anim_fade'} id={props.id} >{'config page placeholder'}</div>
 }

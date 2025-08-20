@@ -2,6 +2,7 @@
 import { app } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
+import EventEmitter from 'node:events'
 import { isDev } from './util.mjs'
 import { console } from './logger.mjs'
 
@@ -14,6 +15,10 @@ const asset_path = path.join(root_path, '/Assets/')
 const config_path = path.join(root_path, '/config.json')
 
 export const config = {}
+
+//config module event emitter
+class CFGEmitter extends EventEmitter {}
+config.update = new CFGEmitter()
 
 console.log('Config manager initialized')
 
@@ -109,7 +114,7 @@ const updateObject = (target, source, allowChanges) => {
 }
 
 //function to update configuration object with boolean to allow making changes to the structure
-config.update = (update, bAllowChanges = false) => {
+function configUpdate(update, bAllowChanges = false){
     updateObject(configuration, update, bAllowChanges)
     writeConfigFile()
 }
@@ -146,7 +151,7 @@ config.device = (label) => {
     //no label found, create new from template
     const device = generateDevice(label)
     console.log('Generating entry for new device: ', label)
-    config.update({ devices:{ [device.label]: device } }, true)
+    configUpdate({ devices:{ [device.label]: device } }, true)
     return device
 }
 
@@ -159,17 +164,18 @@ config.get = (path) => {
 }
 
 config.set = (path, value) => {
-    if(path.length && value){
+    if(value === undefined){ console.error('no value provided for config.set') }
+    else if(!path.length){ console.error('no path provided for config.set') }
+    else{
         //travel the path backwards, starting from furthest branch of json tree  
         let current = { [path.at(-1)]: value }
         //recursive branch wrap
         for(let i = path.length - 2; i >= 0; i--){ current = { [path[i]]: current } }
-        config.update(current, true)
-    }
-    else{
-        console.error('Empty path or value for config.set')
-    }
-    
+        configUpdate(current, true)
+
+        //signal changes to configuration
+        for(const p of path){ config.update.emit(p) }
+    } 
 }
 //let current = { [path.at(-1)]: isNaN(value) ? value : Number(value) }
 
