@@ -10,7 +10,7 @@ body {
 }
 
 :root {
-  --main-spacing: 12px;
+  --main-spacing: 16px;
   --primary-color: #222222;
   --secondary-color: #4e4e4e;
   --accent-color: #ffa126;
@@ -28,7 +28,6 @@ body {
   scroll-behavior: smooth;
   scroll-snap-type: y mandatory;
   scroll-snap-align: center;  
-  margin: -3px;
   padding: 0;
 }
 
@@ -45,7 +44,7 @@ a {
   font-weight: 500;
   font-size: large;
   box-sizing: border-box;
-  border: 1px solid rgb(163, 163, 163);
+  border: 0px solid rgb(163, 163, 163);
   /*border-radius: var(--border-radius);*/
 }
 
@@ -61,13 +60,16 @@ button {
   display: block;
   color: var(--text-color);
   background-color: var(--primary-color);
-  aspect-ratio: 1;
   outline: none;
+  overflow: hidden;
   text-align: center;
-
+  width: var(--tab-width);
   min-width: var(--tab-width);
   max-width: var(--tab-width);
-
+  height: var(--tab-width);
+  min-height: var(--tab-width);
+  max-height: var(--tab-width);
+  white-space: wrap;
   transition: 0.2s;
   border-radius: var(--border-radius);
 }
@@ -101,23 +103,21 @@ button:hover {
 .component {
   display: flex;
   min-height: var(--tab-width);
-  height: fit-content;
-  overflow: hidden;
+  max-height: calc(var(--tab-width) + var(--main-spacing) * 2);
+  /*overflow: hidden;*/
   border-bottom: solid 1px var(--secondary-color);
   vertical-align: text-top;
   text-wrap: nowrap;
-  margin-bottom: var(--main-spacing);
   /*border-radius: var(--border-radius);*/
   padding: var(--main-spacing);
-  padding-top: calc(var(--main-spacing) * 2);
   position: relative;
 }
 
-.component_label {
-  position: absolute;
-  top: calc(var(--main-spacing) / 2);
-  font-size: 20px;
-  z-index: 2;
+.component_content {
+  width: 100%;
+  min-height: var(--tab-width);
+  overflow: hidden;
+  margin: inherit;
 }
 
 /*checkbox*/
@@ -168,9 +168,4 @@ input:checked + .slider:before {
   opacity: 1;
   width: 100%;
   box-shadow: 0 0 10px var(--accent-color);
-}
-
-.status_text {
-  overflow: hidden;
-  border-bottom: 1px solid var(--secondary-color);
 }

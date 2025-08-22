@@ -14,6 +14,9 @@ const asset_path = path.join(root_path, '/Assets/')
 //path to config file
 const config_path = path.join(root_path, '/config.json')
 
+//how long the config manager waits for updates before writing to disk
+const fileWriteInterval = 2000
+
 export const config = {}
 
 //config module event emitter
@@ -24,57 +27,35 @@ console.log('Config manager initialized')
 
 const configTemplate = {
     //list of all config variables and default values
-    devices: {}, 
-    mediapipe: { 
-        PoseLandmarker: {
-            baseOptions: {
-                //modelAssetPath: '/Assets/0.10.21/task/pose_landmarker_lite.task',
-                modelAssetPath: '', 
-                delegate: 'GPU',  //options: 'CPU', 'GPU'
-            },
-            runningMode: 'IMAGE', //options: 'IMAGE', 'VIDEO', 'LIVE_STREAM'
-            numPoses: 1,
-            minPoseDetectionConfidence: 0.5,
-            minPosePresenceConfidence: 0.5,
-            minTrackingConfidence: 0.5,
-            outputSegmentationMasks: false,
-            },
-        HandLandmarker: {
-            baseOptions: {
-                //modelAssetPath: '/Assets/0.10.21/task/hand_landmarker.task',
-                modelAssetPath: '', 
-                delegate: 'GPU',    //options: 'CPU', 'GPU'
-            },
-            runningMode: 'IMAGE', //options: 'IMAGE', 'VIDEO', 'LIVE_STREAM'
-            numHands: 2,
-            minHandDetectionConfidence: 0.5,
-            minHandPresenceConfidence: 0.5,
-            minTrackingConfidence: 0.5,
-            },
-        FaceLandmarker: {
-            baseOptions: {
-                //modelAssetPath: '/Assets/0.10.21/task/face_landmarker.task', 
-                modelAssetPath: '', 
-                delegate: 'GPU',    //options: 'CPU', 'GPU'
-            },
-            runningMode: 'IMAGE', //options: 'IMAGE', 'VIDEO', 'LIVE_STREAM'
-            numFaces: 1,
-            minFaceDetectionConfidence: 0.5,
-            minFacePresenceConfidence: 0.5,
-            minTrackingConfidence: 0.5,
-            outputFaceBlendshapes: false,
-            outputFacialTransformationMatrixes: false,
+    Devices: {}, 
+    Tracking: {
+        Face: {
+            Filepath: '', 
+            Hardware: 'GPU',    //options: 'CPU', 'GPU'
+            TrackingConfidence: 0.5, 
         }, 
-        wasm: ''
+        Hand: {
+            Filepath: '', 
+            Hardware: 'GPU',    //options: 'CPU', 'GPU'
+            TrackingConfidence: 0.5, 
+        }, 
+        Body: {
+            Filepath: '', 
+            Hardware: 'GPU',    //options: 'CPU', 'GPU'
+            TrackingConfidence: 0.5, 
+        }, 
+        WebAssembly: {
+            Filepath: ''
+        }
     },
-    user: { 
-        tracker_port: 8080, 
-        preferredGPU: 'dGPU',
+    User: { 
+        WebsocketPort: 8080, 
+        PreferredGPU: 'dGPU',   //options: 'dGPU', 'iGPU'
     }, 
 }
 
 //memory copy of configs
-var configuration = {}
+config.data = {}
 
 let write_timer = null
 //writes current config object to file
@@ -83,8 +64,8 @@ function writeConfigFile(){
     //500ms time-gate to prevent constant re-writing
     write_timer = setTimeout(() => {
         console.log('Updating config.json')
-        fs.writeFileSync(config_path, JSON.stringify(configuration, null, 4), { encoding: 'utf-8' })
-    }, 500)
+        fs.writeFileSync(config_path, JSON.stringify(config.data, null, 4), { encoding: 'utf-8' })
+    }, fileWriteInterval)
 }
 
 //updates existing object with partial object that matches to the target structure.
@@ -115,63 +96,62 @@ const updateObject = (target, source, allowChanges) => {
 
 //function to update configuration object with boolean to allow making changes to the structure
 function configUpdate(update, bAllowChanges = false){
-    updateObject(configuration, update, bAllowChanges)
+    updateObject(config.data, update, bAllowChanges)
     writeConfigFile()
 }
 
 function generateDevice(label){
-    return {                             
+    return {
         label: label,
-        deviceId: crypto.randomUUID().split('-')[0], 
-        modules: { 
-            FaceLandmarker: false, 
-            PoseLandmarker: false, 
-            HandLandmarker: false 
-        }, 
-        location: {x: 0, y: 0, z: 0}, 
-        rotation: {x: 0, y: 0, z: 0}, 
-        //constraints for .getUserMedia()
-        mediaConstraints: {
-            video: {
-                //width: { ideal: 512 },
-                //height: { ideal: 512 }, 
-                aspectRatio: { ideal: 1.778 }, 
-                frameRate: { ideal: 30 },
-                facingMode: { ideal: 'environment' }
-            }
-        }
+        id: crypto.randomUUID().split('-')[0], 
+        Active: false, 
+        Face: false, 
+        Body: false, 
+        Hand: false,  
+        Location: {x: 0, y: 0, z: 0}, 
+        Rotation: {x: 0, y: 0, z: 0}, 
+        Lens: {k1: 0, k2: 0, k3: 0, centerX: 0.5, centerY: 0.5}
     }
 }
 
 //find device by label
 config.device = (label) => {
-    //if data exists for that label, return it
-    if(configuration.devices[label])return configuration.devices[label]
-
-    //no label found, create new from template
-    const device = generateDevice(label)
-    console.log('Generating entry for new device: ', label)
-    configUpdate({ devices:{ [device.label]: device } }, true)
-    return device
+    if(label != undefined){
+        //if data exists for that label, return it
+        if(config.data.Devices[label]){
+            return config.data.Devices[label]
+        }
+        else {
+            //no label found, create new from template
+            const device = generateDevice(label)
+            console.log('Generating entry for new device: ', label)
+            configUpdate({ Devices:{ [device.label]: device } }, true)
+            return device
+        }        
+    }
+    else {
+        console.error('Config.device label is undefined')
+    }
 }
 
 config.get = (path) => {
     //set current ref to json root
-    let current = configuration
+    let current = config.data
     //traverse to branch following the path array
     path.forEach(ref => { if(current[ref])current = current[ref] })
     return current
 }
 
 config.set = (path, value) => {
-    if(value === undefined){ console.error('no value provided for config.set') }
+    if(value === undefined){ console.error('config.set value is undefined') }
+    else if(path.includes(undefined)){ console.error('config.set path contains undefined') }
     else if(!path.length){ console.error('no path provided for config.set') }
     else{
         //travel the path backwards, starting from furthest branch of json tree  
         let current = { [path.at(-1)]: value }
         //recursive branch wrap
         for(let i = path.length - 2; i >= 0; i--){ current = { [path[i]]: current } }
-        configUpdate(current, true)
+        configUpdate(current, false)
 
         //signal changes to configuration
         for(const p of path){ config.update.emit(p) }
@@ -183,27 +163,29 @@ config.set = (path, value) => {
 if(fs.existsSync(config_path)){
     //config file exists, read
     console.log('config.json found, loading')
-    configuration = JSON.parse(fs.readFileSync(config_path, { encoding: 'utf-8', JSON: true }))
+    config.data = JSON.parse(fs.readFileSync(config_path, { encoding: 'utf-8', JSON: true }))
 }else{
     //config file doesn't exist, generate new from template
     console.log('config.json not found, generating new')
     //assign copy of config template to configuration object
-    Object.assign(configuration, configTemplate)
+    Object.assign(config.data, configTemplate)
     writeConfigFile()
 }
 
 //update filepaths in config to match current app location
+config.set(['Tracking', 'Face', 'Filepath'], path.join(asset_path, 'face_landmarker.task'))
+config.set(['Tracking', 'Hand', 'Filepath'], path.join(asset_path, 'hand_landmarker.task'))
+config.set(['Tracking', 'Body', 'Filepath'], path.join(asset_path, 'pose_landmarker.task'))
+config.set(['Tracking', 'WebAssembly', 'Filepath'], path.join(asset_path, '/wasm/'))
 
-config.set(['mediapipe', 'PoseLandmarker', 'baseOptions', 'modelAssetPath'], path.join(asset_path, 'pose_landmarker.task'))
-config.set(['mediapipe', 'HandLandmarker', 'baseOptions', 'modelAssetPath'], path.join(asset_path, 'hand_landmarker.task'))
-config.set(['mediapipe', 'FaceLandmarker', 'baseOptions', 'modelAssetPath'], path.join(asset_path, 'face_landmarker.task'))
-config.set(['mediapipe', 'wasm'], path.join(asset_path, '/wasm/'))
+//reset all devices active state to false
+Object.keys(config.data.Devices).forEach(label => config.set(['Devices', label, 'Active'], false))
 
 //returns status of hardware acceleration
 config.hwAcc = () => {
     return [
-        config.get(['mediapipe', 'PoseLandmarker', 'baseOptions', 'delegate']), 
-        config.get(['mediapipe', 'HandLandmarker', 'baseOptions', 'delegate']), 
-        config.get(['mediapipe', 'FaceLandmarker', 'baseOptions', 'delegate'])
+        config.get(['Tracking', 'Face', 'Hardware']), 
+        config.get(['Tracking', 'Hand', 'Hardware']), 
+        config.get(['Tracking', 'Body', 'Hardware']), 
       ].includes('GPU')
 }

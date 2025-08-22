@@ -15,18 +15,14 @@ const ipcRender = new IPCEmitter()
 
 //helper function to send data to UI
 function updateUI(channel, data = null){
-  const map = new Map()
-    .set('device', (a) => gui.devices(a))
-    .set('config', (a) => gui.config(a))
-
-  const callback = map.get(channel)
-  ipcRender.emit(channel, callback(data)) 
+  if(gui[channel]){ ipcRender.emit(channel, gui[channel](data)) }
+  else{ console.error(`Cannot call UI update on channel ${channel}`) }
 }
 
 function createGUI(){
   const win = new BrowserWindow({
-    width: 1000,
-    height: 600,
+    width: 1200,
+    height: 1000,
     webPreferences: {
       //todo: check is path right for production
       preload: path.join(app.getAppPath() + '/src/App/api.mjs'),
@@ -42,27 +38,28 @@ function createGUI(){
   if(isDev())win.webContents.openDevTools()
   
   //Events for sending data to UI
-  ipcRender.on('device', (data) => win.webContents.send('device', data))
+  ipcRender.on('devices', (data) => win.webContents.send('devices', data))
   ipcRender.on('config', (data) => win.webContents.send('config', data))
   ipcRender.on('preview', (data) => win.webContents.send('preview', data))
 
   //config manager update events(channels correspond each config.json branch)
-  config.update.on('devices', () => updateUI('device'))
-  config.update.on('mediapipe', () => updateUI('config'))
-  config.update.on('user', () => updateUI('config'))
+  config.update.on('Devices', () => updateUI('devices'))
+  config.update.on('Tracking', () => updateUI('config'))
+  config.update.on('User', () => updateUI('config'))
 
   //Events for receiving data from UI
-  ipcMain.on('devicelist', (e, list) => updateUI('device', list))
-  ipcMain.on('connect', (e, device) => { tracker.toggle(device); updateUI('device') })
+  ipcMain.on('devicelist', (e, list) => updateUI('devices', list))
+  ipcMain.on('connect', (e, device) => tracker.toggle(device))
   ipcMain.on('setconfig', (e, path, value) => config.set(path, value))
-  ipcMain.on('update-request', (e, channel) => updateUI(channel))
+  //generic UI update request
+  ipcMain.on('update', (e, channel) => updateUI(channel))
 
   //Data requests events from UI
   ipcMain.handle('getconfig', (e, path) => { return config.get(path) })
 
   //Utility events
-  ipcMain.on('logmessage', (e, msg) => console.log(msg))
-  ipcMain.on('logerror', (e, msg) => console.error(msg))
+  ipcMain.on('logmessage', (e, msg) => { console.log(msg) })
+  ipcMain.on('logerror', (e, msg) => { console.error(msg) })
 }
 
 //initialization script
