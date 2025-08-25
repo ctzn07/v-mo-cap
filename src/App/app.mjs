@@ -43,13 +43,16 @@ function createGUI(){
   ipcRender.on('preview', (data) => win.webContents.send('preview', data))
 
   //config manager update events(channels correspond each config.json branch)
-  config.update.on('Devices', () => updateUI('devices'))
-  config.update.on('Tracking', () => updateUI('config'))
-  config.update.on('User', () => updateUI('config'))
+  config.update.on('Devices', (path) => updateUI('devices'))
+  config.update.on('Tracking', (path) => updateUI('config'))
+  config.update.on('User', (path) => updateUI('config'))
+  config.update.on('Active', (path, value) => {
+    value ? tracker.connect(path[1]):tracker.disconnect(path[1])
+  })
 
   //Events for receiving data from UI
   ipcMain.on('devicelist', (e, list) => updateUI('devices', list))
-  ipcMain.on('connect', (e, device) => tracker.toggle(device))
+  //ipcMain.on('connect', (e, device) => tracker.toggle(device))
   ipcMain.on('setconfig', (e, path, value) => config.set(path, value))
   //generic UI update request
   ipcMain.on('update', (e, channel) => updateUI(channel))

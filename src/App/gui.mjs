@@ -5,116 +5,99 @@ export const gui = {}
 
 const device_list = []  //list of active devices for the UI
 
-const deviceDataTemplate = () => {
-  //formats the device config data for UI
-  return device_list.map((d) => { return { type: 'Device', data: d } })
-}
-
 const rangeoptions = [
   0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 
   0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 
   0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1]
 
-const configDataTemplate = () => {
-  console.log('config template requested')
-  //formats config options for the UI
+
+function cTemplate(type = '', text = '', path = [], options = []){
+  return {
+      type: type, 
+      text: text, 
+      path: path, //config path will be used to handle setconfig callbacks and showing value
+      options: options
+    }
+  }
+
+//formats the device config data for UI
+const deviceTemplate = (d) => {
+  //input is just device label
+  return {
+    type: 'frame', 
+    horizontal: true, 
+    children: [
+      cTemplate('toggle', null, ['Devices', d, 'Active'], ['Off', 'On']), 
+      cTemplate('text', null, ['Devices', d, 'label'], null), 
+      cTemplate('toggle', 'Face', ['Devices', d, 'Face'], null), 
+      cTemplate('toggle', 'Hand', ['Devices', d, 'Hand'], null), 
+      cTemplate('toggle', 'Body', ['Devices', d, 'Body'], null), 
+    ] 
+  }
+}
+
+//formats config options for the UI
+const configTemplate = () => {
   return [
     {
-      type: 'Config', 
-      data: {
-        label: 'User Settings', 
-        options: [
-          {
-            label: 'Websocket Port', 
-            path: ['User', 'WebsocketPort'], 
-            options: [443, 8080], 
-            value: config.get(['User', 'WebsocketPort'])
-          }, 
-          {
-            label: 'Preferred GPU', 
-            path: ['User', 'PreferredGPU'], 
-            options: ['dGPU', 'iGPU'], 
-            value: config.get(['User', 'PreferredGPU'])
-          },  
-        ]
-      },
+      type: 'frame', 
+      horizontal: false, 
+      children: [
+        cTemplate('text', 'User Settings', null, null), 
+        cTemplate('select', 'Websocket Port', ['User', 'WebsocketPort'], [443, 8080]), 
+        cTemplate('select', 'Preferred GPU', ['User', 'PreferredGPU'], ['dGPU', 'iGPU']), 
+      ],
     }, 
     {
-      type: 'Config', 
-      data: {
-        label: 'Face Tracking', 
-        options: [
-          {
-            label: 'Hardware', 
-            path: ['Tracking', 'Face', 'Hardware'], 
-            options: ['CPU', 'GPU'], 
-            value: config.get(['Tracking', 'Face', 'Hardware'])
-          }, 
-          {
-            label: 'Tracking Confidence', 
-            path: ['Tracking', 'Face', 'TrackingConfidence'], 
-            options: rangeoptions, 
-            value: config.get(['Tracking', 'Face', 'TrackingConfidence'])
-          }, 
-        ]
-      }
-    }, 
+      type: 'frame', 
+      horizontal: false, 
+      children: [
+        cTemplate('text', 'Face Tracking', null, null), 
+        cTemplate('select', 'TrackingConfidence', ['Tracking', 'Face', 'TrackingConfidence'], rangeoptions), 
+        cTemplate('select', 'Detection Hardware', ['Tracking', 'Face', 'Hardware'], ['GPU', 'CPU']), 
+      ],
+    },
     {
-      type: 'Config', 
-      data: {
-        label: 'Hand Tracking', 
-        options: [
-          {
-            label: 'Hardware', 
-            path: ['Tracking', 'Hand', 'Hardware'], 
-            options: ['CPU', 'GPU'], 
-            value: config.get(['Tracking', 'Hand', 'Hardware'])
-          }, 
-          {
-            label: 'Tracking Confidence', 
-            path: ['Tracking', 'Hand', 'TrackingConfidence'], 
-            options: rangeoptions, 
-            value: config.get(['Tracking', 'Hand', 'TrackingConfidence'])
-          }, 
-        ]
-      }
-    }, 
+      type: 'frame', 
+      horizontal: false, 
+      children: [
+        cTemplate('text', 'Hand Tracking', null, null), 
+        cTemplate('select', 'TrackingConfidence', ['Tracking', 'Hand', 'TrackingConfidence'], rangeoptions), 
+        cTemplate('select', 'Detection Hardware', ['Tracking', 'Hand', 'Hardware'], ['GPU', 'CPU']), 
+      ],
+    },
     {
-      type: 'Config', 
-      data: {
-        label: 'Body tracking', 
-        options: [
-          {
-            label: 'Hardware', 
-            path: ['Tracking', 'Body', 'Hardware'], 
-            options: ['CPU', 'GPU'], 
-            value: config.get(['Tracking', 'Body', 'Hardware'])
-          }, 
-          {
-            label: 'Tracking Confidence', 
-            path: ['Tracking', 'Body', 'TrackingConfidence'], 
-            options: rangeoptions, 
-            value: config.get(['Tracking', 'Body', 'TrackingConfidence'])
-          },  
-        ]
-      }
-    }, 
+      type: 'frame', 
+      horizontal: false, 
+      children: [
+        cTemplate('text', 'Body Tracking', null, null), 
+        cTemplate('select', 'TrackingConfidence', ['Tracking', 'Body', 'TrackingConfidence'], rangeoptions), 
+        cTemplate('select', 'Detection Hardware', ['Tracking', 'Body', 'Hardware'], ['GPU', 'CPU']), 
+      ],
+    },
   ]
+}
+
+function injectValues(frame){
+  frame.children.forEach(child => {
+    if(child.path)child.value = config.get(child.path)
+  })
+  return frame
 }
 
 gui.devices = (list) => {
   //Note: list argument is just device labels
+
+  //if list argument was provided, clear the existing data
   if(list){
-      device_list.length = 0  //if list argument was provided, clear the existing data
-      for(const d of list){ device_list.push(config.device(d)) }
+      device_list.length = 0  
+      device_list.push(...list)
   }
-  else{
-      //no list argument provided, refresh existing list
-      device_list.forEach((d, i) => { device_list[i] = config.device(d.label) })
-  }
-  return deviceDataTemplate(device_list)
+  const frames = device_list.map(d => deviceTemplate(d))
+  return frames.map(f => injectValues(f))
 }
 
 gui.config = () => {
-    return configDataTemplate()
+  const frames = configTemplate()
+  return frames.map(f => injectValues(f))
 }

@@ -10,18 +10,6 @@ const secondary_color = style.getPropertyValue('--secondary-color')
 //https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/progress
 
 
-function Toggle({ active, label, apiArgs }){
-  return (
-    <button onClick={(e) => {e.preventDefault();api.send(...apiArgs)}}>
-      {label}<br />
-      <label className="switch">
-        <input type="checkbox" checked={active} readOnly={true} />
-        <span className="slider"></span>
-      </label>
-    </button>
-  )
-}
-
 function Device({ device }){
     return <div className='component' key={device.id} >
         <Toggle active={device.Active} label={device.Active ? 'On' : 'Off'} apiArgs={['connect', device]} />
@@ -32,19 +20,13 @@ function Device({ device }){
     </div>
 }
 
-/* config entry data
-{
-    label: 'Websocket Port', 
-    path: ['User', 'WebsocketPort'], 
-    options: [443, 8080], 
-    value: config.get(['User', 'WebsocketPort'])
-}
-*/
-
 function ConfigEntry({ label, path, options, value }){
     return (
-        <dd>
-            {label + ':' + value}
+        <dd style={{paddingTop: '5px'}}>
+            {label}
+            <div style={{display: 'flex', float: 'right'}} >
+                {'<'}<div style={{width: '100px', textAlign: 'center'}}>{value}</div>{'>'}
+            </div>
         </dd>
     )
 }
@@ -59,12 +41,59 @@ function Config({ config }){
     </div>
 }
 
-function getComponentByType(type, data, index){
-    switch (type) {
-        case 'Device':
-            return <Device device={data} key={type + '_' + index} />
-        case 'Config':
-            return <Config config={data} key={type + '_' + index} />
+function Select({ text, path, options, value }){
+    console.log(text)
+    return <>{text + ':' + value}<br /></> 
+}
+
+function Toggle({ text, path, options, value }){
+    const callback = (e) => {e.preventDefault(); api.send('setconfig', path, !value)}
+    const label = text ? text : options[Number(value)] ? options[Number(value)] : null
+    //TODO: if options length is more than 2 and/or text is not provided, toggle settings are wrong
+    return (
+        <button onClick={e => callback(e)}>
+            {label}<br />
+            <label className="switch">
+                <input type="checkbox" checked={value} readOnly={true} />
+                <span className="slider"></span>
+            </label>
+        </button>
+    )
+}
+
+function Text({ text, path, options, value }){
+    return <div className='frame_content'>{text ? text : value}</div>
+}
+
+function Frame({ horizontal, children, frameKey }){
+    return <div className='frame' style={{display: horizontal ? 'flex' : 'block'}} >
+        {children.map((c, i) => getComponentByType(c, i, frameKey))}
+    </div>
+}
+
+/*Component template:
+return {
+      type: type, 
+      text: text, 
+      path: path, //config path will be used to handle setconfig callbacks and showing value
+      options: options
+    }
+*/
+
+function getComponentByType(data, index, id){   //type, text, path, options
+    const r_key = id + '_' + data.type + '_' + index
+    console.log('key:', r_key)
+
+    switch (data.type) {
+        case 'toggle':
+            return <Toggle {...data} key={r_key} />
+        case 'text':
+            return <Text {...data} key={r_key} />
+        case 'select':
+            return <Select {...data} key={r_key} />
+        case 'frame':
+            data.frameKey = r_key
+            return <Frame {...data} key={r_key} />
         default:
             console.log(`Unknown UI component type: ${type}`)
             break
@@ -75,8 +104,8 @@ export function Page({ id }){
     const [content, setContent] = useState([])
     useEffect(() => {
         const subscribe = (channel) => {
-            api.subscribe(channel, (e, data) => { 
-                setContent(data.map((d, i) => getComponentByType(d.type, d.data, i)))
+            api.subscribe(channel, (e, data) => {
+                setContent(data.map((d, i) => getComponentByType(d, i, id)))
             })
         }
         const cleanup = () => {

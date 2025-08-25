@@ -138,7 +138,9 @@ config.get = (path) => {
     //set current ref to json root
     let current = config.data
     //traverse to branch following the path array
-    path.forEach(ref => { if(current[ref])current = current[ref] })
+    path.forEach(ref => {
+        if(current[ref] != undefined)current = current[ref]
+    })
     return current
 }
 
@@ -154,7 +156,7 @@ config.set = (path, value) => {
         configUpdate(current, false)
 
         //signal changes to configuration
-        for(const p of path){ config.update.emit(p) }
+        for(const p of path){ config.update.emit(p, path, value) }
     } 
 }
 //let current = { [path.at(-1)]: isNaN(value) ? value : Number(value) }

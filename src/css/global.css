@@ -100,7 +100,7 @@ button:hover {
   padding: var(--main-spacing);
 }
 
-.component {
+.frame {
   display: flex;
   min-height: var(--tab-width);
   max-height: calc(var(--tab-width) + var(--main-spacing) * 2);
@@ -113,11 +113,22 @@ button:hover {
   position: relative;
 }
 
-.component_content {
+.frame_content {
   width: 100%;
-  min-height: var(--tab-width);
+  /*min-height: var(--tab-width);*/
   overflow: hidden;
   margin: inherit;
+}
+
+.config_arrow {
+  width: 50px;
+  height: 100%;
+  background-color: transparent;
+  transition: 0.2s;
+}
+
+config_arrow:hover {
+  background-color: var(--secondary-color);
 }
 
 /*checkbox*/

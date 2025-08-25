@@ -8,21 +8,14 @@ tracker.connections = new Map()
 
 //TODO: manage websocket connections
 
-const connect = (d) => {
-    config.set(['Devices', d.label, 'Active'], true)
-    console.log(d.label + ' connected')
+tracker.connect = (d) => {
+    console.log(d + ' connected')
     //TODO: create new tracker instance
-    tracker.connections.set(d.label, 'INSERT WS CONNECTION HERE')
+    tracker.connections.set(d, 'INSERT WS CONNECTION HERE')
 }
 
-const disconnect = (d) => {
-    config.set(['Devices', d.label, 'Active'], false)
+tracker.disconnect = (d) => {
     //TODO: bind this function to ws disconnection event
-    console.log(d.label + ' disconnected')
-    tracker.connections.delete(d.label)
-}
-
-tracker.toggle = (device) => {
-    if(device){ tracker.connections.has(device.label) ? disconnect(device) : connect(device) }
-    else { console.error('No device provided for tracker.connect') }
+    console.log(d + ' disconnected')
+    tracker.connections.delete(d)
 }
