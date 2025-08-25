@@ -3,7 +3,7 @@ import { config } from '../common/config.mjs'
 
 export const gui = {}
 
-const device_list = []  //list of active devices for the UI
+const device_list = []  //list of connected devices
 
 const rangeoptions = [
   0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 
@@ -85,11 +85,8 @@ function injectValues(frame){
   return frame
 }
 
-gui.devices = (list) => {
-  //Note: list argument is just device labels
-
-  //if list argument was provided, clear the existing data
-  if(list){
+gui.devices = (list) => {   //Note: list is an array of device labels
+  if(list){   //if list argument was provided, clear the existing data
       device_list.length = 0  
       device_list.push(...list)
   }

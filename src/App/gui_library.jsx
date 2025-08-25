@@ -9,41 +9,11 @@ const secondary_color = style.getPropertyValue('--secondary-color')
 //https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/meter
 //https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/progress
 
-
-function Device({ device }){
-    return <div className='component' key={device.id} >
-        <Toggle active={device.Active} label={device.Active ? 'On' : 'Off'} apiArgs={['connect', device]} />
-        <div className='component_content'>{device.label}</div>
-        <Toggle active={device.Face} label={'Face'} apiArgs={['setconfig', ['Devices', device.label, 'Face'], !device.Face]} />
-        <Toggle active={device.Hand} label={'Hand'} apiArgs={['setconfig', ['Devices', device.label, 'Hand'], !device.Hand]} />
-        <Toggle active={device.Body} label={'Body'} apiArgs={['setconfig', ['Devices', device.label, 'Body'], !device.Body]} />
-    </div>
-}
-
-function ConfigEntry({ label, path, options, value }){
-    return (
-        <dd style={{paddingTop: '5px'}}>
-            {label}
-            <div style={{display: 'flex', float: 'right'}} >
-                {'<'}<div style={{width: '100px', textAlign: 'center'}}>{value}</div>{'>'}
-            </div>
-        </dd>
-    )
-}
-
-function Config({ config }){
-    console.log(config)
-    return <div className='component' style={{display: 'block'}} >
-        <dl className='component_content' >
-            <dt>{config.label}</dt>
-            {config.options.map((c, index) => (<ConfigEntry label={c.label} path={c.path} options={c.options} value={c.value} key={config.label + '_' + index} />) )}
-        </dl>
-    </div>
-}
-
 function Select({ text, path, options, value }){
-    console.log(text)
-    return <>{text + ':' + value}<br /></> 
+    return <div style={{paddingLeft: 'inherit', paddingTop: 'inherit', display: 'flex'}} >{text + ':'}
+        <div>{value}</div>
+        <br />
+    </div>
 }
 
 function Toggle({ text, path, options, value }){
@@ -66,9 +36,11 @@ function Text({ text, path, options, value }){
 }
 
 function Frame({ horizontal, children, frameKey }){
-    return <div className='frame' style={{display: horizontal ? 'flex' : 'block'}} >
-        {children.map((c, i) => getComponentByType(c, i, frameKey))}
-    </div>
+    return (
+        <div className='frame' style={{display: horizontal ? 'flex' : 'block'}} >
+            {children.map((c, i) => getComponentByType(c, i, frameKey))}
+        </div>
+    )
 }
 
 /*Component template:
@@ -82,7 +54,7 @@ return {
 
 function getComponentByType(data, index, id){   //type, text, path, options
     const r_key = id + '_' + data.type + '_' + index
-    console.log('key:', r_key)
+    //console.log('key:', r_key)
 
     switch (data.type) {
         case 'toggle':
@@ -96,7 +68,7 @@ function getComponentByType(data, index, id){   //type, text, path, options
             return <Frame {...data} key={r_key} />
         default:
             console.log(`Unknown UI component type: ${type}`)
-            break
+            return <></>
     }
 }
 
@@ -119,14 +91,3 @@ export function Page({ id }){
 
     return (<div className={'page anim_fade'} id={id} >{content}</div>)
 }
-
-/*
-<input type="range" min="0" max="1" step="0.1">
-
-<select>
-    <option value="1">1</option>
-    <option value="2">2</option>
-</select>
-
-
-*/

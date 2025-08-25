@@ -46,10 +46,8 @@ function createGUI(){
   config.update.on('Devices', (path) => updateUI('devices'))
   config.update.on('Tracking', (path) => updateUI('config'))
   config.update.on('User', (path) => updateUI('config'))
-  config.update.on('Active', (path, value) => {
-    value ? tracker.connect(path[1]):tracker.disconnect(path[1])
-  })
-
+  config.update.on('Active', (path, value) => tracker.toggle(path[1], value))
+  
   //Events for receiving data from UI
   ipcMain.on('devicelist', (e, list) => updateUI('devices', list))
   //ipcMain.on('connect', (e, device) => tracker.toggle(device))
