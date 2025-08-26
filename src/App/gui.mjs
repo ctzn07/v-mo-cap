@@ -79,9 +79,7 @@ const configTemplate = () => {
 }
 
 function injectValues(frame){
-  frame.children.forEach(child => {
-    if(child.path)child.value = config.get(child.path)
-  })
+  frame.children.forEach(child => { if(child.path){ child.value = config.get(child.path) } })
   return frame
 }
 
@@ -89,6 +87,7 @@ gui.devices = (list) => {   //Note: list is an array of device labels
   if(list){   //if list argument was provided, clear the existing data
       device_list.length = 0  
       device_list.push(...list)
+      device_list.forEach(d => config.device(d))
   }
   const frames = device_list.map(d => deviceTemplate(d))
   return frames.map(f => injectValues(f))

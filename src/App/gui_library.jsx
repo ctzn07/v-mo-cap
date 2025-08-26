@@ -8,10 +8,20 @@ const secondary_color = style.getPropertyValue('--secondary-color')
 //TODO: see
 //https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/meter
 //https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/progress
-
+//
 function Select({ text, path, options, value }){
-    return <div style={{paddingLeft: 'inherit', paddingTop: 'inherit', display: 'flex'}} >{text + ':'}
-        <div>{value}</div>
+    const callback = (e, offset) => {
+        let index = options.lastIndexOf(value) + offset
+        const max = options.length - 1
+        index > max ? index = 0 : index < 0 ? index = max : index = index
+
+        api.send('setconfig', path, options[index])
+    }
+
+    return <div className='select' ><div style={{marginTop: 'auto', marginBottom: 'auto', width: '100%'}} >{text + ':'}</div>
+        <button className='button_small' onClick={e => callback(e, -1)} >{'<'}</button>
+            <div className='select_value' style={{marginTop: 'auto', marginBottom: 'auto'}} >{value}</div>
+        <button className='button_small' onClick={e => callback(e, +1)} >{'>'}</button>
         <br />
     </div>
 }
@@ -21,7 +31,7 @@ function Toggle({ text, path, options, value }){
     const label = text ? text : options[Number(value)] ? options[Number(value)] : null
     //TODO: if options length is more than 2 and/or text is not provided, toggle settings are wrong
     return (
-        <button onClick={e => callback(e)}>
+        <button className='button_large' onClick={e => callback(e)}>
             {label}<br />
             <label className="switch">
                 <input type="checkbox" checked={value} readOnly={true} />
@@ -32,7 +42,7 @@ function Toggle({ text, path, options, value }){
 }
 
 function Text({ text, path, options, value }){
-    return <div className='frame_content'>{text ? text : value}</div>
+    return <div className='frame_content'>{text ? text : null}{value ? value : null}</div>
 }
 
 function Frame({ horizontal, children, frameKey }){

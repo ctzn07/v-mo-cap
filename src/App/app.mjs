@@ -49,6 +49,8 @@ function createGUI(){
   config.update.on('Active', (path, value) => tracker.toggle(path[1], value))
   
   //Events for receiving data from UI
+
+  //TODO: Fix this, GUI can't be responsible for updating device configs//
   ipcMain.on('devicelist', (e, list) => updateUI('devices', list))
   //ipcMain.on('connect', (e, device) => tracker.toggle(device))
   ipcMain.on('setconfig', (e, path, value) => config.set(path, value))

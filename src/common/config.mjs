@@ -69,33 +69,38 @@ function writeConfigFile(){
 }
 
 //updates existing object with partial object that matches to the target structure.
-const updateObject = (target, source, allowChanges) => {
-    const keys = Object.keys(source)
-    if(keys.length){
-        keys.forEach((key) => {
-            //console.print(key, typeof source[key])
-            if(typeof source[key] !== 'string' && key in target){
-                //there is probably a bug here, values are not getting updated without bAllowChanges
-                //even tho the boolean was intended to only allow json structural changes
-                if(updateObject(target[key], source[key], allowChanges)){
-                    target[key] = source[key]
-                }
-            }else{
-                //field does not exists, check if function is allowed to make changes
-                if(allowChanges)target[key] = source[key]
-                //else console.log('discarding excess data', key + ':' + source[key])
+
+const updateObject = (target, source, allowChanges, path = []) => {
+    const fields = Object.keys(source)
+    //iterate over all json fields
+    fields.forEach(field => {
+        path.push(field)
+        if(typeof target[field] === 'object'){
+            //destination is object, dig deeper
+            updateObject(target[field], source[field], allowChanges, path)
+        }
+        else if(typeof target[field] === typeof source[field]){
+            //destination matches, update value
+            //console.log('Updating', path.join('->'), ':', source[field])
+            target[field] = source[field]
+        }
+        else {
+            if(allowChanges){
+                console.log('New Config entry:', path.join('->'), ':', source[field])
+                target[field] = source[field]
             }
-        })
-        //no object tree values found, return false
-        return false
-    }else{
-        //end of object tree branch
-        return true
-    }
+            else{
+                console.log('Config structure changes denied', path.join('->'), ':', source[field])
+            }
+        }
+    })
 }
+
+
 
 //function to update configuration object with boolean to allow making changes to the structure
 function configUpdate(update, bAllowChanges = false){
+    //console.log('configUpdate', update, 'allow changes:', bAllowChanges)
     updateObject(config.data, update, bAllowChanges)
     writeConfigFile()
 }
@@ -116,21 +121,17 @@ function generateDevice(label){
 
 //find device by label
 config.device = (label) => {
-    if(label != undefined){
-        //if data exists for that label, return it
-        if(config.data.Devices[label]){
-            return config.data.Devices[label]
+    console.log('config.device', label)
+    if(label){
+        if(!config.data.Devices[label]){
+            //no entry for device exists, generate new one
+            generateDevice(label)
+            configUpdate({ Devices:{ [label]: generateDevice(label) } }, true)
         }
-        else {
-            //no label found, create new from template
-            const device = generateDevice(label)
-            console.log('Generating entry for new device: ', label)
-            configUpdate({ Devices:{ [device.label]: device } }, true)
-            return device
-        }        
+        return config.data.Devices[label]
     }
     else {
-        console.error('Config.device label is undefined')
+        console.error('config.device - missing argument: label')
     }
 }
 
@@ -138,13 +139,12 @@ config.get = (path) => {
     //set current ref to json root
     let current = config.data
     //traverse to branch following the path array
-    path.forEach(ref => {
-        if(current[ref] != undefined)current = current[ref]
-    })
+    path.forEach(ref => { if(current[ref] != undefined)current = current[ref] })
     return current
 }
 
 config.set = (path, value) => {
+    //console.log('config.set with value:', value)
     if(value === undefined){ console.error('config.set value is undefined') }
     else if(path.includes(undefined)){ console.error('config.set path contains undefined') }
     else if(!path.length){ console.error('no path provided for config.set') }
@@ -159,7 +159,6 @@ config.set = (path, value) => {
         for(const p of path){ config.update.emit(p, path, value) }
     } 
 }
-//let current = { [path.at(-1)]: isNaN(value) ? value : Number(value) }
 
 //check if config file status
 if(fs.existsSync(config_path)){

@@ -26,8 +26,10 @@ body {
   width: 100%;
   overflow: hidden;
   scroll-behavior: smooth;
-  scroll-snap-type: y mandatory;
+  scroll-snap-type: mandatory;
   scroll-snap-align: center;  
+  /*scroll-margin: 50%;*/
+  /*scroll-snap-stop: always;*/
   padding: 0;
 }
 
@@ -46,6 +48,7 @@ a {
   box-sizing: border-box;
   border: 0px solid rgb(163, 163, 163);
   /*border-radius: var(--border-radius);*/
+  transition: 0.2s;
 }
 
 .tab {
@@ -56,7 +59,7 @@ a {
   height: 100%;
 }
 
-button {
+.button_large {
   display: block;
   color: var(--text-color);
   background-color: var(--primary-color);
@@ -70,13 +73,14 @@ button {
   min-height: var(--tab-width);
   max-height: var(--tab-width);
   white-space: wrap;
-  transition: 0.2s;
   border-radius: var(--border-radius);
 }
 
-button:hover {
+.button_large:hover {
   background-color: var(--secondary-color);
 }
+
+
 
 @keyframes fade {
   45%, 55% {opacity: 0;}
@@ -95,6 +99,7 @@ button:hover {
   scroll-behavior: inherit;
   scroll-snap-type: inherit;
   scroll-snap-align: inherit;
+  
   opacity: 0;
   overflow: auto;
   padding: var(--main-spacing);
@@ -120,15 +125,28 @@ button:hover {
   margin: inherit;
 }
 
-.config_arrow {
-  width: 50px;
-  height: 100%;
-  background-color: transparent;
-  transition: 0.2s;
+.select {
+  display: flex;
+  height: calc(var(--tab-width) / 2);
+  padding: inherit;
 }
 
-config_arrow:hover {
-  background-color: var(--secondary-color);
+.select_value {
+  min-width: var(--tab-width);
+  max-width: var(--tab-width);
+  overflow: hidden;
+  text-align: center;
+}
+
+.button_small {
+  min-width: calc(var(--tab-width) / 2);
+  height: 100%;
+  background-color: transparent;
+  color: var(--text-color);
+}
+
+.button_small:hover {
+  color: var(--accent-color);
 }
 
 /*checkbox*/
@@ -153,7 +171,7 @@ config_arrow:hover {
   background-color: var(--primary-color);
   border: solid 1px var(--secondary-color);
   border-radius: var(--border-radius);
-  transition: linear .1s;
+  transition: .2s;
 }
 
 /*slider knob*/
