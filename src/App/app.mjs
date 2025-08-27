@@ -13,10 +13,22 @@ import path from 'path'
 class IPCEmitter extends EventEmitter {}
 const ipcRender = new IPCEmitter()
 
+
+
 //helper function to send data to UI
 function updateUI(channel, data = null){
   if(gui[channel]){ ipcRender.emit(channel, gui[channel](data)) }
   else{ console.error(`Cannot call UI update on channel ${channel}`) }
+}
+
+function updateDeviceList(list){
+  config.devicelist(list) //refresh config file for device entries
+  const allDevices = Object.keys(config.get(['config', 'Devices']))
+  
+  
+  //reset local devices
+  //repopulate local devices
+  //ui update with local devices
 }
 
 function createGUI(){
@@ -51,11 +63,10 @@ function createGUI(){
   //Events for receiving data from UI
 
   //TODO: Fix this, GUI can't be responsible for updating device configs//
-  ipcMain.on('devicelist', (e, list) => updateUI('devices', list))
-  //ipcMain.on('connect', (e, device) => tracker.toggle(device))
+  //ipcMain.on('devicelist', (e, list) => updateUI('devices', list))
+  ipcMain.on('devicelist', (e, list) => updateDeviceList(list))
   ipcMain.on('setconfig', (e, path, value) => config.set(path, value))
-  //generic UI update request
-  ipcMain.on('update', (e, channel) => updateUI(channel))
+  ipcMain.on('update', (e, channel) => updateUI(channel)) //generic UI update request
 
   //Data requests events from UI
   ipcMain.handle('getconfig', (e, path) => { return config.get(path) })

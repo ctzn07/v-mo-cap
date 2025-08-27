@@ -21,7 +21,7 @@ function Select({ text, path, options, value }){
     return <div className='select' ><div style={{marginTop: 'auto', marginBottom: 'auto', width: '100%'}} >{text + ':'}</div>
         <button className='button_small' onClick={e => callback(e, -1)} >{'<'}</button>
             <div className='select_value' style={{marginTop: 'auto', marginBottom: 'auto'}} >{value}</div>
-        <button className='button_small' onClick={e => callback(e, +1)} >{'>'}</button>
+        <button className='button_small' onClick={e => callback(e, 1)} >{'>'}</button>
         <br />
     </div>
 }

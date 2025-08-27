@@ -27,11 +27,11 @@ const deviceTemplate = (d) => {
     type: 'frame', 
     horizontal: true, 
     children: [
-      cTemplate('toggle', null, ['Devices', d, 'Active'], ['Off', 'On']), 
-      cTemplate('text', null, ['Devices', d, 'label'], null), 
-      cTemplate('toggle', 'Face', ['Devices', d, 'Face'], null), 
-      cTemplate('toggle', 'Hand', ['Devices', d, 'Hand'], null), 
-      cTemplate('toggle', 'Body', ['Devices', d, 'Body'], null), 
+      cTemplate('toggle', null, ['local', 'Devices', d, 'Active'], ['Off', 'On']), 
+      cTemplate('text', null, ['config', 'Devices', d, 'label'], null), 
+      cTemplate('toggle', 'Face', ['config', 'Devices', d, 'Face'], null), 
+      cTemplate('toggle', 'Hand', ['config', 'Devices', d, 'Hand'], null), 
+      cTemplate('toggle', 'Body', ['config', 'Devices', d, 'Body'], null), 
     ] 
   }
 }
@@ -44,8 +44,8 @@ const configTemplate = () => {
       horizontal: false, 
       children: [
         cTemplate('text', 'User Settings', null, null), 
-        cTemplate('select', 'Websocket Port', ['User', 'WebsocketPort'], [443, 8080]), 
-        cTemplate('select', 'Preferred GPU', ['User', 'PreferredGPU'], ['dGPU', 'iGPU']), 
+        cTemplate('select', 'Websocket Port', ['config', 'User', 'WebsocketPort'], [443, 8080]), 
+        cTemplate('select', 'Preferred GPU', ['config', 'User', 'PreferredGPU'], ['dGPU', 'iGPU']), 
       ],
     }, 
     {
@@ -53,8 +53,8 @@ const configTemplate = () => {
       horizontal: false, 
       children: [
         cTemplate('text', 'Face Tracking', null, null), 
-        cTemplate('select', 'TrackingConfidence', ['Tracking', 'Face', 'TrackingConfidence'], rangeoptions), 
-        cTemplate('select', 'Detection Hardware', ['Tracking', 'Face', 'Hardware'], ['GPU', 'CPU']), 
+        cTemplate('select', 'TrackingConfidence', ['config', 'Tracking', 'Face', 'TrackingConfidence'], rangeoptions), 
+        cTemplate('select', 'Detection Hardware', ['config', 'Tracking', 'Face', 'Hardware'], ['GPU', 'CPU']), 
       ],
     },
     {
@@ -62,8 +62,8 @@ const configTemplate = () => {
       horizontal: false, 
       children: [
         cTemplate('text', 'Hand Tracking', null, null), 
-        cTemplate('select', 'TrackingConfidence', ['Tracking', 'Hand', 'TrackingConfidence'], rangeoptions), 
-        cTemplate('select', 'Detection Hardware', ['Tracking', 'Hand', 'Hardware'], ['GPU', 'CPU']), 
+        cTemplate('select', 'TrackingConfidence', ['config', 'Tracking', 'Hand', 'TrackingConfidence'], rangeoptions), 
+        cTemplate('select', 'Detection Hardware', ['config', 'Tracking', 'Hand', 'Hardware'], ['GPU', 'CPU']), 
       ],
     },
     {
@@ -71,8 +71,8 @@ const configTemplate = () => {
       horizontal: false, 
       children: [
         cTemplate('text', 'Body Tracking', null, null), 
-        cTemplate('select', 'TrackingConfidence', ['Tracking', 'Body', 'TrackingConfidence'], rangeoptions), 
-        cTemplate('select', 'Detection Hardware', ['Tracking', 'Body', 'Hardware'], ['GPU', 'CPU']), 
+        cTemplate('select', 'TrackingConfidence', ['config', 'Tracking', 'Body', 'TrackingConfidence'], rangeoptions), 
+        cTemplate('select', 'Detection Hardware', ['config', 'Tracking', 'Body', 'Hardware'], ['GPU', 'CPU']), 
       ],
     },
   ]

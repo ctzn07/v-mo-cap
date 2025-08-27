@@ -147,6 +147,7 @@ a {
 
 .button_small:hover {
   color: var(--accent-color);
+  text-shadow: 0 0 5px var(--accent-color);
 }
 
 /*checkbox*/

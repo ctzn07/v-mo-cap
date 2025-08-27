@@ -9,15 +9,19 @@ import { console } from './logger.mjs'
 //TODO: fix non-dev root path
 const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
 
-const asset_path = path.join(root_path, '/Assets/')
+const asset_path = path.join(root_path, './Assets/')
 
-//path to config file
-const config_path = path.join(root_path, '/config.json')
+export const config = {}
+
+//paths to config files
+const config_path = path.join(root_path, './config.json')
+
+//TODO: plugin loader
+const loaded_plugin = null
+const plugin_path = path.join(root_path, `./${loaded_plugin}.json`)
 
 //how long the config manager waits for updates before writing to disk
 const fileWriteInterval = 2000
-
-export const config = {}
 
 //config module event emitter
 class CFGEmitter extends EventEmitter {}
@@ -54,22 +58,49 @@ const configTemplate = {
     }, 
 }
 
-//memory copy of configs
-config.data = {}
+const datastorage = {}
+
+function newStorage(id, filepath = null, template){
+    console.log(`Initiating new storage ${id}`)
+    datastorage[id] = {filepath: filepath}
+    if(filepath && fs.existsSync(filepath)){
+        console.log(`File for storage ${id} already exists, loading...`)
+        const data = JSON.parse(fs.readFileSync(filepath, { encoding: 'utf-8', JSON: true }))
+        Object.assign(datastorage[id], data)
+    }
+    else {
+        if(template){
+            console.log(`Creating new file for storage ${id}...`)
+            Object.assign(datastorage[id], template)
+            writeFile(id)
+        }
+        else{
+            console.error(`New storage initiated for ${id}, but no template supplied`)
+        }
+        
+    }
+}
 
 let write_timer = null
 //writes current config object to file
-function writeConfigFile(){
-    clearTimeout(write_timer)
-    //500ms time-gate to prevent constant re-writing
-    write_timer = setTimeout(() => {
-        console.log('Updating config.json')
-        fs.writeFileSync(config_path, JSON.stringify(config.data, null, 4), { encoding: 'utf-8' })
-    }, fileWriteInterval)
+function writeFile(store_id){
+    if(datastorage[store_id].filepath){   //if filepath exists, write to file
+        clearTimeout(write_timer)
+        //time-gate to prevent constant re-writing
+        write_timer = setTimeout(() => {
+            const writedata = {}
+            const path = datastorage[store_id].filepath
+
+            Object.assign(writedata, datastorage[store_id]) //make a copy of the data
+            delete writedata.filepath   //remove filepath
+
+            console.log('Updating config.json')
+            fs.writeFileSync(path, JSON.stringify(writedata, null, 4), { encoding: 'utf-8' })
+        }, fileWriteInterval)
+    }
 }
 
 //updates existing object with partial object that matches to the target structure.
-
 const updateObject = (target, source, allowChanges, path = []) => {
     const fields = Object.keys(source)
     //iterate over all json fields
@@ -81,112 +112,124 @@ const updateObject = (target, source, allowChanges, path = []) => {
         }
         else if(typeof target[field] === typeof source[field]){
             //destination matches, update value
-            //console.log('Updating', path.join('->'), ':', source[field])
+            console.log('Updating', path.join('>'), ':', source[field])
             target[field] = source[field]
         }
         else {
             if(allowChanges){
-                console.log('New Config entry:', path.join('->'), ':', source[field])
+                console.log(`New entry:`, path.join('>'), ':', source[field])
                 target[field] = source[field]
             }
             else{
-                console.log('Config structure changes denied', path.join('->'), ':', source[field])
+                console.log('Update denied', path.join('>'), ':', source[field])
             }
         }
     })
 }
 
-
-
 //function to update configuration object with boolean to allow making changes to the structure
-function configUpdate(update, bAllowChanges = false){
-    //console.log('configUpdate', update, 'allow changes:', bAllowChanges)
-    updateObject(config.data, update, bAllowChanges)
-    writeConfigFile()
+function configUpdate(id, update, bAllowChanges = false){
+    //console.log('configUpdate', id, 'allow changes:', bAllowChanges, ' data:', update)
+    if(datastorage[id] && typeof update === 'object'){
+        updateObject(datastorage[id], update, bAllowChanges)
+        writeFile(id)
+    }
+    else {
+        console.error(`Config Update on ${id} failed - data: ${typeof update} `)
+    }
 }
 
 function generateDevice(label){
     return {
         label: label,
         id: crypto.randomUUID().split('-')[0], 
-        Active: false, 
         Face: false, 
         Body: false, 
-        Hand: false,  
-        Location: {x: 0, y: 0, z: 0}, 
-        Rotation: {x: 0, y: 0, z: 0}, 
-        Lens: {k1: 0, k2: 0, k3: 0, centerX: 0.5, centerY: 0.5}
+        Hand: false, 
+        Calibration: {
+            Loc: {x: 0, y: 0, z: 0}, 
+            Rot: {x: 0, y: 0, z: 0}, 
+            Lens: {k1: 0, k2: 0, k3: 0, centerX: 0.5, centerY: 0.5}
+        } 
     }
 }
 
-//find device by label
-config.device = (label) => {
-    console.log('config.device', label)
-    if(label){
-        if(!config.data.Devices[label]){
-            //no entry for device exists, generate new one
-            generateDevice(label)
-            configUpdate({ Devices:{ [label]: generateDevice(label) } }, true)
+//generate device entry to config
+config.devicelist = (list) => {
+    for(const label of list){
+        if(!datastorage['config'].Devices[label]){  //no entry for device exists, generate new one
+            configUpdate('config', { Devices: { [label]: generateDevice(label) } }, true)
         }
-        return config.data.Devices[label]
-    }
-    else {
-        console.error('config.device - missing argument: label')
     }
 }
 
 config.get = (path) => {
-    //set current ref to json root
-    let current = config.data
-    //traverse to branch following the path array
-    path.forEach(ref => { if(current[ref] != undefined)current = current[ref] })
-    return current
+    //remove target storage from path
+    const store_id = path.shift()
+    if(datastorage[store_id]){
+        //set current ref to object root
+        let current = datastorage[store_id]
+        //traverse to branch following the path array
+        path.forEach(ref => { if(current[ref] != undefined)current = current[ref] })
+        return current
+    }
+    else{
+        console.error(`config.get - unknown storage path: ${store_id}`)
+        return false
+    }
+}
+
+function setCheck(path, value){
+    if(value === undefined){
+        console.error('config.set - missing argument: value')
+        return false
+    }
+    if(path.includes(undefined)){
+        console.error('config.set - path contains undefined')
+        return false
+    }
+    if(!path.length){
+        console.error('config.set - no path provided')
+        return false
+    }
+    else {
+        return true
+    }
 }
 
 config.set = (path, value) => {
-    //console.log('config.set with value:', value)
-    if(value === undefined){ console.error('config.set value is undefined') }
-    else if(path.includes(undefined)){ console.error('config.set path contains undefined') }
-    else if(!path.length){ console.error('no path provided for config.set') }
-    else{
+    //remove target storage from path
+    const store_id = path.shift()
+
+    if(setCheck(path, value) && datastorage[store_id]){
         //travel the path backwards, starting from furthest branch of json tree  
         let current = { [path.at(-1)]: value }
         //recursive branch wrap
         for(let i = path.length - 2; i >= 0; i--){ current = { [path[i]]: current } }
-        configUpdate(current, false)
+
+        //only allow structural changes to storages that don't get written to file
+        configUpdate(store_id, current, (!datastorage[store_id].filepath))
 
         //signal changes to configuration
         for(const p of path){ config.update.emit(p, path, value) }
     } 
 }
 
-//check if config file status
-if(fs.existsSync(config_path)){
-    //config file exists, read
-    console.log('config.json found, loading')
-    config.data = JSON.parse(fs.readFileSync(config_path, { encoding: 'utf-8', JSON: true }))
-}else{
-    //config file doesn't exist, generate new from template
-    console.log('config.json not found, generating new')
-    //assign copy of config template to configuration object
-    Object.assign(config.data, configTemplate)
-    writeConfigFile()
-}
+
+newStorage('config', config_path, configTemplate)
+newStorage('local', null, {})
 
 //update filepaths in config to match current app location
-config.set(['Tracking', 'Face', 'Filepath'], path.join(asset_path, 'face_landmarker.task'))
-config.set(['Tracking', 'Hand', 'Filepath'], path.join(asset_path, 'hand_landmarker.task'))
-config.set(['Tracking', 'Body', 'Filepath'], path.join(asset_path, 'pose_landmarker.task'))
-config.set(['Tracking', 'WebAssembly', 'Filepath'], path.join(asset_path, '/wasm/'))
-
-//reset all devices active state to false
-Object.keys(config.data.Devices).forEach(label => config.set(['Devices', label, 'Active'], false))
+config.set(['config', 'Tracking', 'Face', 'Filepath'], path.join(asset_path, 'face_landmarker.task'))
+config.set(['config', 'Tracking', 'Hand', 'Filepath'], path.join(asset_path, 'hand_landmarker.task'))
+config.set(['config', 'Tracking', 'Body', 'Filepath'], path.join(asset_path, 'pose_landmarker.task'))
+config.set(['config', 'Tracking', 'WebAssembly', 'Filepath'], path.join(asset_path, '/wasm/'))
 
 //returns status of hardware acceleration
 config.hwAcc = () => {
     return [
-        config.get(['Tracking', 'Face', 'Hardware']), 
-        config.get(['Tracking', 'Hand', 'Hardware']), 
-        config.get(['Tracking', 'Body', 'Hardware']), 
+        config.get(['config', 'Tracking', 'Face', 'Hardware']), 
+        config.get(['config', 'Tracking', 'Hand', 'Hardware']), 
+        config.get(['config', 'Tracking', 'Body', 'Hardware']), 
       ].includes('GPU')
 }
