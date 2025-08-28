@@ -21,20 +21,31 @@ function updateUI(channel, data = null){
   else{ console.error(`Cannot call UI update on channel ${channel}`) }
 }
 
-function updateDeviceList(list){
+function updateDevices(list){
   config.devicelist(list) //refresh config file for device entries
-  const allDevices = Object.keys(config.get(['config', 'Devices']))
+  const newList = new Set(list)
+  const configList = config.get(['local', 'Devices'])
+  //local devices list might be null at start of the session, thus the check
+  const oldList = new Set(configList ? Object.keys(configList) : [])
+
+  newList.difference(oldList).forEach(d => config.set(['local', 'Devices', d], {Active: false}))
+  oldList.difference(newList).forEach(d => {
+    config.set(['local', 'Devices', d, 'Active'], false)
+    config.delete(['local', 'Devices', d])
+  })
   
-  
-  //reset local devices
-  //repopulate local devices
-  //ui update with local devices
+  updateUI('devices')
 }
+
+//const added_devices = newList.difference(oldList)
+//const removed_devices = oldList.difference(newList)
+//added_devices.forEach(d => config.set(['local', 'Devices', d], {Active: false}))
+//removed_devices.forEach(d => config.delete(['local', 'Devices', d]))
 
 function createGUI(){
   const win = new BrowserWindow({
     width: 1200,
-    height: 1000,
+    height: 600,
     webPreferences: {
       //todo: check is path right for production
       preload: path.join(app.getAppPath() + '/src/App/api.mjs'),
@@ -64,12 +75,12 @@ function createGUI(){
 
   //TODO: Fix this, GUI can't be responsible for updating device configs//
   //ipcMain.on('devicelist', (e, list) => updateUI('devices', list))
-  ipcMain.on('devicelist', (e, list) => updateDeviceList(list))
+  ipcMain.on('devicelist', (e, list) => updateDevices(list))
   ipcMain.on('setconfig', (e, path, value) => config.set(path, value))
   ipcMain.on('update', (e, channel) => updateUI(channel)) //generic UI update request
 
   //Data requests events from UI
-  ipcMain.handle('getconfig', (e, path) => { return config.get(path) })
+  //ipcMain.handle('getconfig', (e, path) => { return config.get(path) })
 
   //Utility events
   ipcMain.on('logmessage', (e, msg) => { console.log(msg) })

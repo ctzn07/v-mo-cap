@@ -61,10 +61,10 @@ const configTemplate = {
 const datastorage = {}
 
 function newStorage(id, filepath = null, template){
-    console.log(`Initiating new storage ${id}`)
+    console.log(`Initiating new ${id} storage`)
     datastorage[id] = {filepath: filepath}
     if(filepath && fs.existsSync(filepath)){
-        console.log(`File for storage ${id} already exists, loading...`)
+        console.log(`File for ${id} already exists, loading...`)
         const data = JSON.parse(fs.readFileSync(filepath, { encoding: 'utf-8', JSON: true }))
         Object.assign(datastorage[id], data)
     }
@@ -75,9 +75,8 @@ function newStorage(id, filepath = null, template){
             writeFile(id)
         }
         else{
-            console.error(`New storage initiated for ${id}, but no template supplied`)
+            console.error(`New storage ${id} initiated, but no template supplied`)
         }
-        
     }
 }
 
@@ -112,12 +111,12 @@ const updateObject = (target, source, allowChanges, path = []) => {
         }
         else if(typeof target[field] === typeof source[field]){
             //destination matches, update value
-            console.log('Updating', path.join('>'), ':', source[field])
+            //console.log('Updating', path.join('>'), ':', source[field])
             target[field] = source[field]
         }
         else {
             if(allowChanges){
-                console.log(`New entry:`, path.join('>'), ':', source[field])
+                //console.log(`New entry:`, path.join('>'), ':', source[field])
                 target[field] = source[field]
             }
             else{
@@ -165,17 +164,21 @@ config.devicelist = (list) => {
 
 config.get = (path) => {
     //remove target storage from path
-    const store_id = path.shift()
+    const store_id = path[0]
+    //console.log('config.get', path.join(' > '))
     if(datastorage[store_id]){
         //set current ref to object root
         let current = datastorage[store_id]
-        //traverse to branch following the path array
-        path.forEach(ref => { if(current[ref] != undefined)current = current[ref] })
-        return current
+        //traverse to branch following the path array(skipping 0 as it is storage indicator)
+        path.forEach((ref, i) => { if(i)current = current[ref] } )
+        console.log('config.get', path.join(' > ') + ': ' + current)
+
+        const returnvalue = current
+        return returnvalue
     }
     else{
         console.error(`config.get - unknown storage path: ${store_id}`)
-        return false
+        return {}
     }
 }
 
@@ -199,13 +202,14 @@ function setCheck(path, value){
 
 config.set = (path, value) => {
     //remove target storage from path
-    const store_id = path.shift()
+    const store_id = path[0]
+    console.log('config.set', path.join(' > '),' : ' , value)
 
     if(setCheck(path, value) && datastorage[store_id]){
         //travel the path backwards, starting from furthest branch of json tree  
         let current = { [path.at(-1)]: value }
         //recursive branch wrap
-        for(let i = path.length - 2; i >= 0; i--){ current = { [path[i]]: current } }
+        for(let i = path.length - 2; i >= 1; i--){ current = { [path[i]]: current } }
 
         //only allow structural changes to storages that don't get written to file
         configUpdate(store_id, current, (!datastorage[store_id].filepath))
@@ -215,6 +219,24 @@ config.set = (path, value) => {
     } 
 }
 
+config.delete = (path) => {
+    const store_id = path[0]
+    // Only allow structural changes to storages that don't get written to file
+    if (!datastorage[store_id].filepath && store_id) {
+        let current = datastorage[store_id]
+        let prop = path.at(-1)
+        // Traverse to the parent of the property to delete
+        //while (path.length > 1){ parent = parent[path.shift()] }
+        path.forEach((ref, i) => { if(i && ref !== prop)current = current[ref] } )
+        if(current[prop]){
+            console.log('config.delete', path.join(' > '))
+            delete current[prop]
+        }
+        else {
+            console.error('config.delete - no entry found')
+        }
+    }
+}
 
 newStorage('config', config_path, configTemplate)
 newStorage('local', null, {})

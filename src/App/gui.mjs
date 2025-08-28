@@ -3,8 +3,6 @@ import { config } from '../common/config.mjs'
 
 export const gui = {}
 
-const device_list = []  //list of connected devices
-
 const rangeoptions = [
   0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 
   0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 
@@ -79,16 +77,19 @@ const configTemplate = () => {
 }
 
 function injectValues(frame){
-  frame.children.forEach(child => { if(child.path){ child.value = config.get(child.path) } })
+  frame.children.forEach(child => {
+    if(child.path){
+      const value = config.get(child.path)
+      child.value = value
+    }
+  })
   return frame
 }
 
-gui.devices = (list) => {   //Note: list is an array of device labels
-  if(list){   //if list argument was provided, clear the existing data
-      device_list.length = 0  
-      device_list.push(...list)
-      device_list.forEach(d => config.device(d))
-  }
+gui.devices = () => {   //Note: list is an array of device labels
+  const obj = config.get(['local', 'Devices'])
+  const device_list = obj ? Object.keys(obj) : []
+
   const frames = device_list.map(d => deviceTemplate(d))
   return frames.map(f => injectValues(f))
 }

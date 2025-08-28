@@ -27,6 +27,7 @@ function Select({ text, path, options, value }){
 }
 
 function Toggle({ text, path, options, value }){
+    //console.log(path.join(' > ') + ':' + value)
     const callback = (e) => {e.preventDefault(); api.send('setconfig', path, !value)}
     const label = text ? text : options[Number(value)] ? options[Number(value)] : null
     //TODO: if options length is more than 2 and/or text is not provided, toggle settings are wrong
