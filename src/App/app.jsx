@@ -2,7 +2,7 @@
 import { StrictMode, Children } from "react"
 import { createRoot } from 'react-dom/client'
 
-import { Page } from './gui_library'
+import { Page } from './gui.jsx'
 
 const root = createRoot(document.getElementById('root'))
 

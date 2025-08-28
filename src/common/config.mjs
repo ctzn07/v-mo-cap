@@ -6,6 +6,8 @@ import EventEmitter from 'node:events'
 import { isDev } from './util.mjs'
 import { console } from './logger.mjs'
 
+const printDebug = false
+
 //TODO: fix non-dev root path
 const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
 
@@ -111,16 +113,17 @@ const updateObject = (target, source, allowChanges, path = []) => {
         }
         else if(typeof target[field] === typeof source[field]){
             //destination matches, update value
-            //console.log('Updating', path.join('>'), ':', source[field])
+            //if(printDebug)console.log('updateObject:update', path.join(' > ') + ': ' + source[field])
             target[field] = source[field]
         }
         else {
             if(allowChanges){
                 //console.log(`New entry:`, path.join('>'), ':', source[field])
+                //if(printDebug)console.log('updateObject:change', path.join(' > ') + ': ' + source[field])
                 target[field] = source[field]
             }
             else{
-                console.log('Update denied', path.join('>'), ':', source[field])
+                console.error('Update denied', path.join('>'), ':', source[field])
             }
         }
     })
@@ -171,7 +174,7 @@ config.get = (path) => {
         let current = datastorage[store_id]
         //traverse to branch following the path array(skipping 0 as it is storage indicator)
         path.forEach((ref, i) => { if(i)current = current[ref] } )
-        console.log('config.get', path.join(' > ') + ': ' + current)
+        if(printDebug)console.log('config.get', path.join(' > ') + ': ' + current)
 
         const returnvalue = current
         return returnvalue
@@ -203,7 +206,7 @@ function setCheck(path, value){
 config.set = (path, value) => {
     //remove target storage from path
     const store_id = path[0]
-    console.log('config.set', path.join(' > '),' : ' , value)
+    if(printDebug)console.log('config.set', path.join(' > '),' : ' , (typeof value === 'object') ? JSON.stringify(value) : value)
 
     if(setCheck(path, value) && datastorage[store_id]){
         //travel the path backwards, starting from furthest branch of json tree  
@@ -229,7 +232,7 @@ config.delete = (path) => {
         //while (path.length > 1){ parent = parent[path.shift()] }
         path.forEach((ref, i) => { if(i && ref !== prop)current = current[ref] } )
         if(current[prop]){
-            console.log('config.delete', path.join(' > '))
+            if(printDebug)console.log('config.delete', path.join(' > '))
             delete current[prop]
         }
         else {
