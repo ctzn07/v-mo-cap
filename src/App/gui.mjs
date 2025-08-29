@@ -98,3 +98,20 @@ gui.config = () => {
   const frames = configTemplate()
   return frames.map(f => injectValues(f))
 }
+
+gui.preview = () => {
+  const frames = [{
+      type: 'frame', 
+      horizontal: false, 
+      children: [
+        {
+          type: 'custom', 
+          text: '3D Preview', 
+          path: null, 
+          options: null, 
+          value: './../../src/App/preview.mjs'
+        }
+      ],
+    }]
+  return frames
+}

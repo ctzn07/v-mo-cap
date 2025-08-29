@@ -13,8 +13,6 @@ import path from 'path'
 class IPCEmitter extends EventEmitter {}
 const ipcRender = new IPCEmitter()
 
-
-
 //helper function to send data to UI
 function updateUI(channel, data = null){
   if(gui[channel]){ ipcRender.emit(channel, gui[channel](data)) }
@@ -25,16 +23,16 @@ function updateDevices(list){
   config.devicelist(list) //refresh config file for device entries
   const newList = new Set(list)
   const configList = config.get(['local', 'Devices'])
-  //local devices list might be null at start of the session, thus the check
+  //local devices list is null at the start of the application, needs validity check
   const oldList = new Set(configList ? Object.keys(configList) : [])
 
+  //added devices
   newList.difference(oldList).forEach(d => config.set(['local', 'Devices', d], {Active: false}))
+  //removed devices
   oldList.difference(newList).forEach(d => {
     config.set(['local', 'Devices', d, 'Active'], false)
     config.delete(['local', 'Devices', d])
   })
-  
-  updateUI('devices')
 }
 
 //const added_devices = newList.difference(oldList)
@@ -45,7 +43,9 @@ function updateDevices(list){
 function createGUI(){
   const win = new BrowserWindow({
     width: 1200,
-    height: 600,
+    height: 600, 
+    minWidth: 500, 
+    minHeight: 500, 
     webPreferences: {
       //todo: check is path right for production
       preload: path.join(app.getAppPath() + '/src/App/api.mjs'),

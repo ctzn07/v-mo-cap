@@ -27,8 +27,14 @@ navigator.mediaDevices.ondevicechange = () => {
 }
 navigator.mediaDevices.ondevicechange() //call initial update
 
+function scrollTo(id){
+    document.getElementById(id).scrollIntoView({ block: 'center' })
+}
+
 function TabButton({ scrollTarget, label }){
-    return <button className='button_large' onClick={ () => {document.getElementById(scrollTarget).scrollIntoView({ block: 'center' })} }>{label}</button>
+    return <button className='button_large' onClick={ () => {scrollTo(scrollTarget)} }>
+            {label}
+        </button>
 }
 
 function MainWindow({ children }){

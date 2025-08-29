@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 
 const style = window.getComputedStyle(document.body)
 //style.getPropertyValue('value name')
@@ -8,7 +8,22 @@ const secondary_color = style.getPropertyValue('--secondary-color')
 //TODO: see
 //https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/meter
 //https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/progress
-//
+
+function Custom({ text, path, options, value }){
+    const [domElement, setDomElement] = useState(null);
+    const container = useRef(null)
+    useEffect(() => {
+        const importModule = async () => {
+            await import(value).then(mod => setDomElement(mod.default))
+        }
+        container.current.innerHTML = null
+        importModule()
+        container.current.append(domElement)
+    }, [])
+
+    return (<div>{text ? text : null}<br /><div ref={ container } /></div>)
+}
+
 function Select({ text, path, options, value }){
     const callback = (e, offset) => {
         let index = options.lastIndexOf(value) + offset
@@ -74,6 +89,8 @@ function getComponentByType(data, index, id){   //type, text, path, options
             return <Text {...data} key={r_key} />
         case 'select':
             return <Select {...data} key={r_key} />
+        case 'custom':
+            return <Custom {...data} key={r_key} />
         case 'frame':
             data.frameKey = r_key
             return <Frame {...data} key={r_key} />

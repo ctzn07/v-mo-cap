@@ -28,8 +28,6 @@ body {
   scroll-behavior: smooth;
   scroll-snap-type: mandatory;
   scroll-snap-align: center;  
-  /*scroll-margin: 50%;*/
-  /*scroll-snap-stop: always;*/
   padding: 0;
 }
 
@@ -48,15 +46,14 @@ a {
   box-sizing: border-box;
   border: 0px solid rgb(163, 163, 163);
   /*border-radius: var(--border-radius);*/
-  transition: 0.2s;
 }
 
 .tab {
-  float: left;
   background-color: transparent;
   position: fixed;
   padding: var(--main-spacing);
   height: 100%;
+  z-index: 2;
 }
 
 .button_large {
@@ -80,10 +77,8 @@ a {
   background-color: var(--secondary-color);
 }
 
-
-
 @keyframes fade {
-  45%, 55% {opacity: 0;}
+  0%, 100% {opacity: 0;}
   50% {opacity: 1;}
 }
 
@@ -93,16 +88,17 @@ a {
 }
 
 .page {
-  float: right;
-  width: calc(100% - (var(--tab-width) + var(--main-spacing) * 2));
+  position: relative;
+  /*left: calc(var(--tab-width) + var(--main-spacing) * 2);*/
+  /*width: calc(100% - (var(--tab-width) + var(--main-spacing) * 2));*/
+  min-width: fit-content;
+  width: 100vw;
   height: 100vh;
-  scroll-behavior: inherit;
-  scroll-snap-type: inherit;
-  scroll-snap-align: inherit;
-  
+  padding: var(--main-spacing);
+  padding-left: calc(var(--tab-width) + var(--main-spacing) * 2);
   opacity: 0;
   overflow: auto;
-  padding: var(--main-spacing);
+  transition: opacity 0.2s;
 }
 
 .frame {
@@ -122,7 +118,10 @@ a {
   width: 100%;
   /*min-height: var(--tab-width);*/
   overflow: hidden;
-  margin: inherit;
+  /*margin: inherit;*/
+  margin-top: auto;
+  margin-bottom: auto;
+  white-space: pre-line;
 }
 
 .select {
