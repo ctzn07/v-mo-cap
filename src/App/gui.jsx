@@ -16,8 +16,9 @@ function Custom({ text, path, options, value }){
         const importModule = async () => {
             await import(value).then(mod => setDomElement(mod.default))
         }
-        container.current.innerHTML = null
         importModule()
+        container.current.innerHTML = null
+        
         container.current.append(domElement)
     }, [])
 

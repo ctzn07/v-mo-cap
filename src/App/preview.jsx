@@ -1,6 +1,5 @@
-import * as THREE from '../../node_modules/three'
-//import { OrbitControls } from './three/addons/controls/OrbitControls.js'
-//import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { useEffect, useState, useRef } from 'react'
+import * as THREE from 'three'
 
 const css_colors = {
   //--primary-color
@@ -21,35 +20,17 @@ clock.autoStart = true
 let deltatime = 0
 
 //shorthand helpers
-const Vec3 = (x = 0, y = 0, z = 0) => {return new THREE.Vector3(x,y,z)}
-const Deg = (angle) => {return THREE.MathUtils.degToRad(angle)}
+const Vec3 = (x = 0, y = 0, z = 0) => { return new THREE.Vector3(x,y,z) }
+const Deg = (angle) => { return THREE.MathUtils.degToRad(angle) }
 
 //new WebGL renderer, background { alpha: true }
 const renderer = new THREE.WebGLRenderer({ alpha: true })
 
-/*
-export default function DomElement(){
-    return renderer.domElement
-}*/
-
-export default renderer.domElement
-
 //change scene orientation to Z-Up
 scene.rotateOnWorldAxis(Vec3(1,0,0), Deg(-90))
 
-//orbit controls 
-//const controls = new OrbitControls(camera, renderer.domElement)
 //initial camera position
-camera.position.set(-3,5,8)
-//controls.update()
-
-//parent react component controls the renderer size
-function setRenderSize(width, height){
-  //console.log(width, height)
-  renderer.setSize(width, height)
-  camera.aspect = width / height
-  camera.updateProjectionMatrix()
-}
+camera.position.set(0,3.5,10)
 
 //Floor grid lines
 const grid = {
@@ -84,8 +65,9 @@ const axesHelper = new THREE.AxesHelper(1)
   .translateZ(0.01)
 scene.add( axesHelper )
 
+//!!!
 function previewData(data){
-  //draw tracking data particles here
+    //TODO:draw tracking data particles here
 }
 
 //animation loop
@@ -93,5 +75,55 @@ function animate() {
   deltatime = clock.getDelta()
   renderer.render( scene, camera )
 }
+
 animate()
 renderer.setAnimationLoop( animate )
+
+let timegate = null
+
+export function Preview({ id }) { 
+  //this should basically work with any regular DOM element
+  const container = useRef(null)
+  
+    useEffect(() => {
+        //remove html elements
+        container.current.innerHTML = null
+        //append canvas
+        container.current.append(renderer.domElement)
+
+        //subscription to UI updates
+        const subscribe = (channel) => {
+            api.subscribe(channel, (e, data) => previewData(data))
+        }
+        subscribe(id)   
+
+        const updateSize = () => {
+            renderer.setSize(0, 0)
+            if(timegate)clearTimeout(timegate)
+            timegate = setTimeout(() => {
+                const width = container.current.clientWidth
+                const height = container.current.clientHeight
+                renderer.setSize(width, height)
+                camera.aspect = width / height
+                camera.updateProjectionMatrix()
+            }, 100)
+        }
+        //call initial size update
+        updateSize()
+
+        //add eventlistener for resizing
+        addEventListener('resize', updateSize)
+
+        const cleanup = () => {
+            api.unsubscribe(id, subscribe)
+            removeEventListener('resize', updateSize)
+        }
+        //cleanup return
+        return cleanup
+
+    }, [ container, renderer.domElement ])
+
+    return <div className={'page anim_fade'} id={id} >
+            <div ref={ container } style={{width: '100%', height: '100%'}} />
+    </div>
+}

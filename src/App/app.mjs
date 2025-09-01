@@ -22,6 +22,7 @@ function updateUI(channel, data = null){
 function updateDevices(list){
   config.devicelist(list) //refresh config file for device entries
   const newList = new Set(list)
+  
   const configList = config.get(['local', 'Devices'])
   //local devices list is null at the start of the application, needs validity check
   const oldList = new Set(configList ? Object.keys(configList) : [])
@@ -34,11 +35,6 @@ function updateDevices(list){
     config.delete(['local', 'Devices', d])
   })
 }
-
-//const added_devices = newList.difference(oldList)
-//const removed_devices = oldList.difference(newList)
-//added_devices.forEach(d => config.set(['local', 'Devices', d], {Active: false}))
-//removed_devices.forEach(d => config.delete(['local', 'Devices', d]))
 
 function createGUI(){
   const win = new BrowserWindow({

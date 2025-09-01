@@ -3,6 +3,7 @@ import { StrictMode, Children } from "react"
 import { createRoot } from 'react-dom/client'
 
 import { Page } from './gui.jsx'
+import { Preview } from './preview.jsx'
 
 const root = createRoot(document.getElementById('root'))
 
@@ -54,7 +55,7 @@ function Main(){
             <MainWindow>
                 <Page id='devices' label={'Devices'} />
                 <Page id='config' label={'Config'} />
-                <Page id='preview' label={'Preview'} />
+                <Preview id='preview' label={'Preview'} />
             </MainWindow>
         </StrictMode>)
 
@@ -62,7 +63,7 @@ function Main(){
         <MainWindow>
             <Page id='devices' label={'Devices'} />
             <Page id='config' label={'Config'} />
-            <Page id='preview' label={'Preview'} />
+            <Preview id='preview' label={'Preview'} />
         </MainWindow>
     )
     return isDev ? dev : prod

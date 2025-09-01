@@ -109,7 +109,7 @@ gui.preview = () => {
           text: '3D Preview', 
           path: null, 
           options: null, 
-          value: './../../src/App/preview.mjs'
+          value: ''
         }
       ],
     }]
