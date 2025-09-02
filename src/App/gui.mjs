@@ -42,7 +42,7 @@ const configTemplate = () => {
       horizontal: false, 
       children: [
         cTemplate('text', 'User Settings', null, null), 
-        cTemplate('select', 'Websocket Port', ['config', 'User', 'WebsocketPort'], [443, 8080]), 
+        cTemplate('select', 'Websocket Port', ['config', 'User', 'WebsocketPort'], [80, 443]), 
         cTemplate('select', 'Preferred GPU', ['config', 'User', 'PreferredGPU'], ['dGPU', 'iGPU']), 
       ],
     }, 

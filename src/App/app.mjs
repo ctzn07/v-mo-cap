@@ -4,7 +4,7 @@ import EventEmitter from 'node:events'
 import { console } from '../common/logger.mjs'
 import { config } from '../common/config.mjs'
 import { gui } from './gui.mjs'
-import { tracker } from './trackers.mjs'
+import { wsmanager } from './wsmanager.mjs'
 
 import { isDev, platform } from '../common/util.mjs'
 
@@ -44,7 +44,7 @@ function createGUI(){
     minHeight: 500, 
     webPreferences: {
       //todo: check is path right for production
-      preload: path.join(app.getAppPath() + '/src/App/api.mjs'),
+      preload: path.join(app.getAppPath() + '/src/common/api.mjs'),
       sandbox: false,   //preloading .mjs is not compatible with sandboxing
     },
     autoHideMenuBar: true,
@@ -65,10 +65,8 @@ function createGUI(){
   config.update.on('Devices', (path) => updateUI('devices'))
   config.update.on('Tracking', (path) => updateUI('config'))
   config.update.on('User', (path) => updateUI('config'))
-  config.update.on('Active', (path, value) => tracker.toggle(path[1], value))
   
   //Events for receiving data from UI
-
   ipcMain.on('devicelist', (e, list) => updateDevices(list))
   ipcMain.on('setconfig', (e, path, value) => config.set(path, value))
   ipcMain.on('update', (e, channel) => updateUI(channel)) //generic UI update request
@@ -84,18 +82,14 @@ function createGUI(){
 //initialization script
 export default function initApp(args){
   console.log('App initialized with arguments:', args)
-  //TODO: Start websocket server for trackers
-  
-
+  wsmanager.start()
   createGUI()
 }
 
 app.on('ready', () => {}) //this does not trigger
 
 app.on('window-all-closed', () => {
-  //TODO: Stop tracker websocket server
+  wsmanager.stop('application closing')
   if (platform() !== 'darwin') app.quit()
-  //app.exit()
-
-  //process.exit(1)
+  app.exit(1)
 })
