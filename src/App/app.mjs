@@ -69,8 +69,6 @@ function createGUI(){
   
   //Events for receiving data from UI
 
-  //TODO: Fix this, GUI can't be responsible for updating device configs//
-  //ipcMain.on('devicelist', (e, list) => updateUI('devices', list))
   ipcMain.on('devicelist', (e, list) => updateDevices(list))
   ipcMain.on('setconfig', (e, path, value) => config.set(path, value))
   ipcMain.on('update', (e, channel) => updateUI(channel)) //generic UI update request
@@ -87,6 +85,8 @@ function createGUI(){
 export default function initApp(args){
   console.log('App initialized with arguments:', args)
   //TODO: Start websocket server for trackers
+  
+
   createGUI()
 }
 
@@ -96,5 +96,6 @@ app.on('window-all-closed', () => {
   //TODO: Stop tracker websocket server
   if (platform() !== 'darwin') app.quit()
   //app.exit()
+
   //process.exit(1)
 })

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 
 const css_colors = {
@@ -30,7 +30,9 @@ const renderer = new THREE.WebGLRenderer({ alpha: true })
 scene.rotateOnWorldAxis(Vec3(1,0,0), Deg(-90))
 
 //initial camera position
-camera.position.set(0,3.5,10)
+camera.position.set(0,5,8)
+camera.lookAt(Vec3(0,0,0))
+
 
 //Floor grid lines
 const grid = {

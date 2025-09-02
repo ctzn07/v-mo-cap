@@ -100,18 +100,8 @@ gui.config = () => {
 }
 
 gui.preview = () => {
-  const frames = [{
-      type: 'frame', 
-      horizontal: false, 
-      children: [
-        {
-          type: 'custom', 
-          text: '3D Preview', 
-          path: null, 
-          options: null, 
-          value: ''
-        }
-      ],
-    }]
-  return frames
+  //preview is suppose to return current tracking coordinates
+  //not implemented yet
+  
+  return []
 }
