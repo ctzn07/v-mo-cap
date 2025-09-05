@@ -1,7 +1,7 @@
 //Module that manages tracker connections
 import { WebSocketServer } from 'ws'
 import EventEmitter from 'node:events'
-import { exec } from 'child_process'
+import { exec, spawn } from 'child_process'
 import { config } from '../common/config.mjs'
 import { console } from '../common/logger.mjs'
 
@@ -16,14 +16,22 @@ var wss = null
 class WSEmitter extends EventEmitter {}
 wsmanager.update = new WSEmitter()
 
+const io_logger = (error, stdout, stderr) => {
+                if(error){console.error('TRACKER:', error)}
+                if(stdout){console.log('TRACKER:', stdout)}
+                if(stderr){console.error('TRACKER:', stderr)}
+            }
 
 const connect = (d) => {
     //create connection reservation for this device
-    //spawn new tracker instance
-    console.log(`starting tracker for ${d}`)
-    //start tracker process with id as argument
-    if(isDev())exec(`npm run dev tracker=true device=${d}`, (...args) => console.log('TRACKER:', ...args))
-    else null//TODO: run packaged tracker .exe here
+    const ws = 'ws://localhost:443'
+    console.log('executing')
+    if(isDev()){
+        exec(`npm run worker worker=true device="${d}" ws="${ws}"`, (...args) => io_logger(...args))
+    }
+    else{
+        console.error('wsmanager.mjs - Tracker spawning not set up for production')
+    }
 }
 
 const disconnect = (d) => {

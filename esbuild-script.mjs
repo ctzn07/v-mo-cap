@@ -9,9 +9,9 @@ fs.rmSync('./dist/', {recursive: true, force: true})
 await esbuild.build({
     entryPoints: [
         './src/App/app.jsx', 
-        './src/Tracker/tracker.jsx', 
+        './src/Worker/script.mjs', 
         './src/app.html', 
-        './src/tracker.html', 
+        './src/worker.html', 
         './src/css/global.css'
     ], 
     bundle: true, 

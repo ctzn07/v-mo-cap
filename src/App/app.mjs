@@ -83,10 +83,8 @@ function createGUI(){
 export default function initApp(args){
   console.log('App initialized with arguments:', args)
   wsmanager.start()
-  createGUI()
+  app.on('ready', () => createGUI())
 }
-
-app.on('ready', () => {}) //this does not trigger
 
 app.on('window-all-closed', () => {
   wsmanager.stop('application closing')
