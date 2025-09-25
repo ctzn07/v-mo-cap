@@ -9,10 +9,36 @@ class IPCEmitter extends EventEmitter {}
 const ipcRender = new IPCEmitter()
 
 //helper for sending data to worker front-end
-function sendData(channel, data){ ipcRender.emit(channel, data) }
+function sendData(channel, ...args){ ipcRender.emit(channel, ...args) }
 
-function createGUI(data){
-  const config = data
+/*
+//TODO: this should be done at api.mjs
+const requestData = (channel, ...args) => {
+  let timer = null
+  //unique response channel to tell requests apart
+  const response_channel = crypto.randomUUID()
+
+  return new Promise((resolve, reject) => {
+    const listener = (...args) => {
+      clearTimeout(timer)
+      resolve(...args)
+    }
+    //one-time listener for response
+    //NOTE: Replace this with global even emitter instead
+    //setting up single-time listeners will probably clog up garbage collection
+    ipcMain.once(response_channel, listener)
+
+    timer = setTimeout(() => {
+      ipcMain.removeListener(response_channel, listener)
+      reject(new Error(`Data request on ${channel} timed out`))
+    }, 1000)
+
+    sendData(channel, response_channel, ...args)
+  })
+}*/
+
+function createGUI(params){
+  //data.ws     //websocket address
   const win = new BrowserWindow({
     width: 800, 
     height: 400, 
@@ -23,7 +49,7 @@ function createGUI(data){
     }, 
     autoHideMenuBar: true, 
     show: isDev(), 
-    title: `VMC Worker(${config.device})`, 
+    title: `VMC Worker(${params.device})`, 
   })
   //todo: check is path right for production
   const htmlpath = path.join(app.getAppPath() + '/dist/worker.html')
@@ -37,17 +63,22 @@ function createGUI(data){
   //close window/exit application when websocket connection closes
 
   //Events for sending data to worker front-end
-  ipcRender.on('channel', (data) => win.webContents.send('channel', data))
+  //ipcRender.on('datarequest', (...args) => win.webContents.send('datarequest', ...args))
+  ipcRender.on('startStream', (data) => win.webContents.send('startStream', data))
+
+  win.webContents.on('did-finish-load', () => sendData('startStream', params.device))
 
   //Events for receiving data from worker front-end
-  ipcMain.on('channel', (e, data) => {})
+  //ipcMain.on('channel', (e, data) => {})
 
   //Event for handling data requests from worker front-end
-  ipcMain.handle('channel', (e) => { return false })
+  //ipcMain.handle('params', (e, ...args) => { return params })
 
   //Utility events
-  ipcMain.on('logmessage', (e, msg) => { })
-  ipcMain.on('logerror', (e, msg) => { })
+  //ipcMain.on('logmessage', (e, msg) => { })
+  //ipcMain.on('logerror', (e, msg) => { })
+  
+  
 }
 
 export default function initWorker(args){

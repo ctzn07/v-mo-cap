@@ -9,8 +9,8 @@ contextBridge.exposeInMainWorld('api', {
     subscribe: (channel, callback) => ipcRenderer.on(channel, (...args) => callback(...args)), 
     unsubsribe: (channel, listener) => ipcRenderer.removeListener(channel, listener), 
 
-    //UI Data requests
-    request: (channel, ...args) => ipcRenderer.invoke(channel, ...args),  
+    //UI->Main Data requests
+    request: (channel, ...args) => ipcRenderer.invoke(channel, ...args), 
 
     //UI Utility
     //log: (message) => ipcRenderer.send('logmessage', message), 
