@@ -8,63 +8,81 @@ import { console } from '../common/logger.mjs'
 import { isDev, platform } from '../common/util.mjs'
 
 export const wsmanager = {}
-const connections = new Map()
 
 var wss = null
+const token_timeout = 5000
 
 //websocket module event emitter
 class WSEmitter extends EventEmitter {}
 wsmanager.update = new WSEmitter()
 
 const io_logger = (error, stdout, stderr) => {
-                if(error){console.error('TRACKER:', error)}
-                if(stdout){console.log('TRACKER:', stdout)}
-                if(stderr){console.error('TRACKER:', stderr)}
-            }
+    if(error){console.error('WORKER:', error)}
+    if(stdout){console.log('WORKER:', stdout)}
+    if(stderr){console.error('WORKER:', stderr)}
+}
+
+function initConnection(device, ws){
+    config.set(['local', 'Devices', device, 'ws'], ws)
+    
+    ws.on('message', (message, isBinary) => {
+        if(!isBinary){
+            //only handle string messages
+            const packet = JSON.parse(message)
+            if(packet.type && packet.data){ wsmanager.update.emit(packet.type, packet.data) }
+            else{ console.error(`Websocket(${device}): package is missing type or data`) }
+        }
+        else { console.error(`Websocket(${device}): received binary data, expected string`) }
+    })
+    ws.on('error', (e) => console.error(e))
+    ws.on('close', (code, reason) => { console.log(`${device} connection closed - ${code}`) })
+}
 
 const connect = (d) => {
-    //create connection reservation for this device
-    const ws = 'ws://localhost:443'
-    console.log('executing')
+    const port = config.get(['config', 'User', 'WebsocketPort'])
+    //generate unique connection ID
+    const token = crypto.randomUUID().split('-').shift()
+
+    //define new connection listener
+    const listener = (device) => wsmanager.update.once(token, (ws) => initConnection(device, ws))
+    listener(d) //create new listener
+
+    //set token to expire
+    setTimeout(() => {
+        if(!config.get(['local', 'Devices', d, 'ws'])){
+            //if connection hasn't been made before timeout, set device back to inactive
+            config.set(['local', 'Devices', d, 'Active'], false)
+        }
+        wsmanager.update.removeListener(token, listener)    //remove listener
+        //console.log(`Token ${token} expired`)
+    }, token_timeout)
+
     if(isDev()){
-        exec(`npm run worker worker=true device="${d}" ws="${ws}"`, (...args) => io_logger(...args))
+        //worker needs port and token as params
+        exec(`npm run worker worker=true route=${port + '/' + token}`, (...args) => io_logger(...args))
     }
-    else{
-        console.error('wsmanager.mjs - Tracker spawning not set up for production')
-    }
+    else{ console.error('wsmanager.mjs - Worker spawning not set up for production') }
 }
 
 const disconnect = (d) => {
-    //disconnect tracker for this device
-    //remove token from connection list
-    //set device active status to false
-}
-
-const newConnection = (ws, req) => {
-    const id = req.url.split('/').at(-1)  //get connection ID
-    //create event bindings for new connection
-    ws.on('open', () => {
-        //tracker connection open
-        console.log('new ws connection open')
-    })
-    ws.on('upgrade', (res) => {
-        //connection upgrade event with response
-        console.log('ws connection upgraded')
-    })
-    ws.on('message', (data, isBinary) => {
-        console.log('ws connection sent data:', data)
-    })
-    ws.on('close', (code, reason) => {
-        //what to do when client disconnects
-        console.log(code, ' - ws connection closed:', reason)
-    })
+    config.get(['local', 'Devices', d, 'ws'])?.close(1000)
+    config.delete(['local', 'Devices', d, 'ws'])
 }
 
 wsmanager.start = () => {
     const wsport = config.get(['config', 'User', 'WebsocketPort'])
     if(typeof wsport === 'number'){
-        wss = new WebSocketServer({port: wsport})
-        wss.on('connection', (ws, req) => newConnection(ws, req))
+        wss = new WebSocketServer({
+            port: wsport, 
+            perMessageDeflate: false, 
+        })
+        
+        wss.on('connection', (ws, req) => {
+            //get connection ID
+            const token = req.url.split('/').at(-1)
+            //emit new connection event
+            wsmanager.update.emit(token, ws)
+        })
         wss.on('close', (ws) => {/* ??? */})
         wss.on('listening', () => console.log(`WSS listening at port ${wsport}`))
         wss.on('error', (err) => console.error('WSS error: ', err))
@@ -84,7 +102,7 @@ wsmanager.stop = (msg = '') => {
 
 //if websocket port changes, restart server
 config.update.on('WebsocketPort', (path, value) => {
-    //TODO: send instructions to all trackers for reconnection
+    //TODO: reconnect all devices
     wsmanager.stop(`config changed, restarting`)
     wsmanager.start()
 })

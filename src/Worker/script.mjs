@@ -3,7 +3,7 @@ import * as Tasks from '@mediapipe/tasks-vision'
 
 //Create video element
 const video = document.createElement('video')
-video.autoplay = false
+video.autoplay = true
 video.muted = true
 
 //Create canvas element
@@ -19,11 +19,13 @@ video.onresize = (e) => {
 document.body.appendChild(video)
 document.body.appendChild(canvas)
 
-const landmarkers = []
+const mediapipe = []
 
 function getTrack(){ return video.srcObject.getVideoTracks()[0] }
 
-function openStream(label) {
+//open webcam mediastream
+api.subscribe('open-device', (e, label) => {
+    if(!label)throw new Error('No Mediadevice provided')
     const constraints = {
         video: {
             //deviceId: id
@@ -40,17 +42,23 @@ function openStream(label) {
         .finally(() => { 
             navigator.mediaDevices.getUserMedia(constraints)    //apply constraints
                 .then(source => video.srcObject = source)   //set videofeed source
-                .finally(() => {
-                    video.play()    //play video
-                    //TODO? redirect mediastream to canvas using captureStream()???
-                    //load mediapipe modules
-                    //inform main process load is ready
-                })
         })
         .catch(e => console.log('error opening videostream:', e))
-}
+})
 
-api.subscribe('startStream', (e, label) => openStream(label))
+//load mediapipe detectors
+api.subscribe('load-mediapipe', (e, config) => {
+    //if(!config)throw new Error('No Mediapipe configuration provided')
+
+    //load Webassembly
+    Tasks['FilesetResolver'].forVisionTasks(config.wasm)
+        .then((wasm) => {
+            ['PoseLandmarker', 'HandLandmarker', 'FaceLandmarker']
+                .forEach(label => Tasks[label].createFromOptions(wasm, config[label])
+                    .then(mod => mediapipe[label] = mod))
+        })
+        .catch(e => console.log('Error loading mediapipe:', e))
+})
 
 //video stream suspended(for example; disconnected device)
 //video.onsuspend(e => stop(e, 'Video suspended'))
