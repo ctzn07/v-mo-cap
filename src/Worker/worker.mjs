@@ -6,12 +6,6 @@ import { WebSocket } from 'ws'
 import { isDev, platform } from '../common/util.mjs'
 import path from 'path'
 
-//TODO
-//check config data
-//connect websocket
-//do websocket bindings to corresponding events
-//close window/exit application when websocket connection closes
-
 function createGUI(params){
   const win = new BrowserWindow({
     width: 800, 
@@ -32,11 +26,12 @@ function createGUI(params){
 
   //page has finished loading
   win.webContents.on('did-finish-load', () => {
-    //connect to main app using websocket
+    //connect to main process using websocket
     const ws = new WebSocket(`ws://localhost:${params.route}`, {perMessageDeflate: false})
-
+    const send = (channel, packet) => ws.send(JSON.stringify({type: channel, data: packet}))
+    
     //Events from main process
-    ws.on('open', () => ws.send(JSON.stringify('test')))
+    ws.on('open', () => send('logerror', 'template string'))
     
     ws.on('message', (packet, isBinary) => {})
 
@@ -53,7 +48,6 @@ function createGUI(params){
     //Utility events
     //ipcMain.on('logmessage', (e, msg) => { })
     //ipcMain.on('logerror', (e, msg) => { })
-    
   })
 }
 
@@ -65,50 +59,6 @@ app.on('window-all-closed', () => {
   if(platform() !== 'darwin')app.quit()
   app.exit(0)
 })
-
-/*
-const mp_tempconfig = {
-        PoseLandmarker: {
-            baseOptions: {
-                modelAssetPath: 'D:\\VSCode_Projects\\pxltask\\Assets\\task\\pose_landmarker.task',
-                delegate: 'GPU'
-            },
-            runningMode: 'IMAGE',
-            numPoses: 1,
-            minPoseDetectionConfidence: 0.5,
-            minPosePresenceConfidence: 0.5,
-            minTrackingConfidence: 0.5,
-            outputSegmentationMasks: false
-        },
-        HandLandmarker: {
-            baseOptions: {
-                modelAssetPath: 'D:\\VSCode_Projects\\pxltask\\Assets\\task\\hand_landmarker.task',
-                delegate: 'GPU'
-            },
-            runningMode: 'IMAGE',
-            numHands: 2,
-            minHandDetectionConfidence: 0.5,
-            minHandPresenceConfidence: 0.5,
-            minTrackingConfidence: 0.5
-        },
-        FaceLandmarker: {
-            baseOptions: {
-                modelAssetPath: 'D:\\VSCode_Projects\\pxltask\\Assets\\task\\face_landmarker.task',
-                delegate: 'GPU'
-            },
-            runningMode: 'IMAGE',
-            numFaces: 1,
-            minFaceDetectionConfidence: 0.5,
-            minFacePresenceConfidence: 0.5,
-            minTrackingConfidence: 0.5,
-            outputFaceBlendshapes: false,
-            outputFacialTransformationMatrixes: false
-        },
-        wasm: 'D:\\VSCode_Projects\\pxltask\\Assets\\wasm\\'
-    }
-*/
-
-
 
 /*
 //TODO: this should be done at api.mjs

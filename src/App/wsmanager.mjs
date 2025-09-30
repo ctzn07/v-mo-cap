@@ -10,7 +10,7 @@ import { isDev, platform } from '../common/util.mjs'
 export const wsmanager = {}
 
 var wss = null
-const token_timeout = 5000
+const token_timeout = 3000
 
 //websocket module event emitter
 class WSEmitter extends EventEmitter {}
@@ -22,26 +22,28 @@ const io_logger = (error, stdout, stderr) => {
     if(stderr){console.error('WORKER:', stderr)}
 }
 
+
 function initConnection(device, ws){
     config.set(['local', 'Devices', device, 'ws'], ws)
     
     ws.on('message', (message, isBinary) => {
-        if(!isBinary){
-            //only handle string messages
+        if(!isBinary){  //only handle string messages
             const packet = JSON.parse(message)
-            if(packet.type && packet.data){ wsmanager.update.emit(packet.type, packet.data) }
+            if(packet.type && packet.data){ wsmanager.update.emit(packet.type, packet.data, device) }
             else{ console.error(`Websocket(${device}): package is missing type or data`) }
         }
         else { console.error(`Websocket(${device}): received binary data, expected string`) }
     })
     ws.on('error', (e) => console.error(e))
-    ws.on('close', (code, reason) => { console.log(`${device} connection closed - ${code}`) })
+    ws.on('close', (code, reason) => {
+        //TODO: change device activity state
+        console.log(`${device} connection closed - ${code}:${reason}`)
+    })
 }
 
 const connect = (d) => {
     const port = config.get(['config', 'User', 'WebsocketPort'])
-    //generate unique connection ID
-    const token = crypto.randomUUID().split('-').shift()
+    const token = crypto.randomUUID().split('-').shift()    //generate unique connection ID
 
     //define new connection listener
     const listener = (device) => wsmanager.update.once(token, (ws) => initConnection(device, ws))
@@ -53,8 +55,8 @@ const connect = (d) => {
             //if connection hasn't been made before timeout, set device back to inactive
             config.set(['local', 'Devices', d, 'Active'], false)
         }
-        wsmanager.update.removeListener(token, listener)    //remove listener
-        //console.log(`Token ${token} expired`)
+        //remove listener(in case it was never used)
+        wsmanager.update.removeListener(token, listener)
     }, token_timeout)
 
     if(isDev()){
@@ -78,10 +80,8 @@ wsmanager.start = () => {
         })
         
         wss.on('connection', (ws, req) => {
-            //get connection ID
-            const token = req.url.split('/').at(-1)
-            //emit new connection event
-            wsmanager.update.emit(token, ws)
+            const token = req.url.split('/').at(-1) //get connection token
+            wsmanager.update.emit(token, ws)    //emit new connection event
         })
         wss.on('close', (ws) => {/* ??? */})
         wss.on('listening', () => console.log(`WSS listening at port ${wsport}`))
@@ -93,12 +93,17 @@ wsmanager.start = () => {
 }
 
 wsmanager.stop = (msg = '') => {
-    //todo: kill all active connections
+    //todo?: kill all active connections
     //1001	Going Away
     //1006	Abnormal Closure
     //1012	Service Restart
     wss.close(() => console.log('WSS closed:', msg))
 }
+
+//TODO: assing package.type API
+wsmanager.update.on('logmessage', (msg, source) => console.log(source + ':' + msg))
+wsmanager.update.on('logerror', (err, source) => console.error(source + ':' + err))
+
 
 //if websocket port changes, restart server
 config.update.on('WebsocketPort', (path, value) => {
