@@ -6,7 +6,7 @@ import EventEmitter from 'node:events'
 import { isDev } from './util.mjs'
 import { console } from './logger.mjs'
 
-const printDebug = false
+const printDebug = true
 
 //TODO: fix non-dev root path
 const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
@@ -103,30 +103,33 @@ function writeFile(store_id){
 
 //updates existing object with partial object that matches to the target structure.
 const updateObject = (target, source, allowChanges, path = []) => {
-    const fields = Object.keys(source)
-    //iterate over all json fields
-    fields.forEach(field => {
-        path.push(field)
-        if(typeof target[field] === 'object'){
-            //destination is object, dig deeper
-            updateObject(target[field], source[field], allowChanges, path)
-        }
-        else if(typeof target[field] === typeof source[field]){
-            //destination matches, update value
-            //if(printDebug)console.log('updateObject:update', path.join(' > ') + ': ' + source[field])
-            target[field] = source[field]
-        }
-        else {
-            if(allowChanges){
-                //console.log(`New entry:`, path.join('>'), ':', source[field])
-                //if(printDebug)console.log('updateObject:change', path.join(' > ') + ': ' + source[field])
+    if(source){
+        //iterate over all json fields
+        Object.keys(source).forEach(field => {
+            path.push(field)
+            if(target[field] && typeof target[field] === 'object'){
+                //destination is object, dig deeper
+                updateObject(target[field], source[field], allowChanges, path)
+            }
+            else if(typeof target[field] === typeof source[field]){
+                //destination matches, update value
+                //if(printDebug)console.log('updateObject:update', path.join(' > ') + ': ' + source[field])
                 target[field] = source[field]
             }
-            else{
-                console.error('Update denied', path.join('>'), ':', source[field])
+            else {
+                if(allowChanges){
+                    //console.log(`New entry:`, path.join('>'), ':', source[field])
+                    //if(printDebug)console.log('updateObject:change', path.join(' > ') + ': ' + source[field])
+                    target[field] = source[field]
+                }
+                else{
+                    console.error('Update denied', path.join('>'), ':', source[field])
+                }
             }
-        }
-    })
+        })
+    }else{
+        console.error('Unable to update config object: Fields are empty')
+    }
 }
 
 //function to update configuration object with boolean to allow making changes to the structure
