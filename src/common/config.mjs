@@ -7,7 +7,7 @@ import { isDev } from './util.mjs'
 import { console } from './logger.mjs'
 
 //options: get, set, delete, update
-const printDebug = ['update']
+const printDebug = []
 
 //TODO: fix non-dev root path
 const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
@@ -102,20 +102,27 @@ function writeFile(store_id){
     }
 }
 
-function getOperand(a){
+function getType(a){
+    console.log(typeof a)
     switch (typeof a) {
         case 'object':
-            return new Object()
+            //return new Object()
+            return {}
         case 'boolean':
-            return new Boolean()
+            //return new Boolean()
+            return false
         case 'number':
-            return new Number()
+            //return new Number()
+            return 0
         case 'bigint':
-            return new BigInt()
+            //return new BigInt()
+            return 0
         case 'string':
-            return new String()
+            //return new String()
+            return ''
         case 'symbol':
-            return new Symbol()
+            //return new Symbol()
+            return {}
         default:
             return null
     }
@@ -139,8 +146,17 @@ const updateObject = (target, source, allowChanges, path = []) => {
             else if(typeof target[field] === 'undefined'){  //destination is not defined
                 if(allowChanges){
                     //target[field] = source[field]
-                    target[field] = getOperand(source[field])
-                    updateObject(target[field], source[field], allowChanges, path)
+
+                    //target[field] = getOperand(source[field])
+                    //updateObject(target[field], source[field], allowChanges, path)
+
+                    if(typeof source[field] !== 'object'){
+                        target[field] = source[field]
+                    }else{
+                        target[field] = {}
+                        updateObject(target[field], source[field], allowChanges, path)
+                    }
+                    
                 } else { console.error('some error message about blocking config changes') }
             }
         })

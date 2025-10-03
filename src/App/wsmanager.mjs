@@ -61,7 +61,7 @@ config.update.on('WebsocketPort', (path, value) => {
 })
 
 config.update.on('Devices', (value) => {
-    console.log('wsmanager GOT DEVICE UPDATE---------------------------- ')
+    console.log(value)
 })
 
 //config.update.on('Devices', (path, value) => console.log('Devices update:', path.join('>'), ':', value))
