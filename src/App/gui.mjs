@@ -25,7 +25,7 @@ const deviceTemplate = (d) => {
     type: 'frame', 
     horizontal: true, 
     children: [
-      cTemplate('toggle', null, ['local', 'Devices', d, 'Active'], ['Off', 'On']), 
+      //cTemplate('toggle', null, ['local', 'Devices', d, 'Active'], ['Off', 'On']), 
       cTemplate('text', null, ['config', 'Devices', d, 'label'], null), 
       cTemplate('toggle', 'Face', ['config', 'Devices', d, 'Face'], null), 
       cTemplate('toggle', 'Hand', ['config', 'Devices', d, 'Hand'], null), 
@@ -88,7 +88,7 @@ function injectValues(frame){
 
 gui.devices = () => {   //Note: list is an array of device labels
   const obj = config.get(['local', 'Devices'])
-  const device_list = obj ? Object.keys(obj) : []
+  const device_list = obj ? Object.keys(obj).filter(d => obj[d].Available) : []
 
   const frames = device_list.map(d => deviceTemplate(d))
   return frames.map(f => injectValues(f))

@@ -20,20 +20,14 @@ function updateUI(channel, data = null){
 }
 
 function updateDevices(list){
-  config.devicelist(list) //refresh config file for device entries
+  config.devicelist(list)
   const newList = new Set(list)
-  
-  const configList = config.get(['local', 'Devices'])
-  //local devices list is null at the start of the application, needs validity check
-  const oldList = new Set(configList ? Object.keys(configList) : [])
 
-  //added devices
-  newList.difference(oldList).forEach(d => config.set(['local', 'Devices', d], {Active: false}))
-  //removed devices
-  oldList.difference(newList).forEach(d => {
-    config.set(['local', 'Devices', d, 'Active'], false)
-    config.delete(['local', 'Devices', d])
-  })
+  const oldList = new Set(Object.keys(config.get(['local', 'Devices']) || {}))
+  
+  for(const d of newList.union(oldList)){
+    config.set(['local', 'Devices', d, 'Available'], newList.has(d))
+  }
 }
 
 function createGUI(){
@@ -62,9 +56,9 @@ function createGUI(){
   ipcRender.on('preview', (data) => win.webContents.send('preview', data))
 
   //config manager update events(channels correspond each config.json branch)
-  config.update.on('Devices', (path) => updateUI('devices'))
-  config.update.on('Tracking', (path) => updateUI('config'))
-  config.update.on('User', (path) => updateUI('config'))
+  config.update.on('Devices', () => updateUI('devices'))
+  config.update.on('Tracking', () => updateUI('config'))
+  config.update.on('User', () => updateUI('config'))
   
   //Events for receiving data from UI
   ipcMain.on('devicelist', (e, list) => updateDevices(list))

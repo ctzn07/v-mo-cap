@@ -6,7 +6,8 @@ import EventEmitter from 'node:events'
 import { isDev } from './util.mjs'
 import { console } from './logger.mjs'
 
-const printDebug = true
+//options: get, set, delete, update
+const printDebug = ['update']
 
 //TODO: fix non-dev root path
 const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
@@ -101,36 +102,57 @@ function writeFile(store_id){
     }
 }
 
+function getOperand(a){
+    switch (typeof a) {
+        case 'object':
+            return new Object()
+        case 'boolean':
+            return new Boolean()
+        case 'number':
+            return new Number()
+        case 'bigint':
+            return new BigInt()
+        case 'string':
+            return new String()
+        case 'symbol':
+            return new Symbol()
+        default:
+            return null
+    }
+}
+
 //updates existing object with partial object that matches to the target structure.
 const updateObject = (target, source, allowChanges, path = []) => {
-    if(source){
+    const updates = []
+    if(typeof source !== 'undefined'){
         //iterate over all json fields
-        Object.keys(source).forEach(field => {
+        Object.keys(source).forEach(field => {  
             path.push(field)
-            if(target[field] && typeof target[field] === 'object'){
-                //destination is object, dig deeper
+            updates.push({route: path.join('/'), data: source[field]})
+
+            if(target[field] && typeof target[field] === 'object'){ //destination is object, dig deeper
                 updateObject(target[field], source[field], allowChanges, path)
             }
-            else if(typeof target[field] === typeof source[field]){
-                //destination matches, update value
-                //if(printDebug)console.log('updateObject:update', path.join(' > ') + ': ' + source[field])
+            else if(typeof target[field] === typeof source[field]){ //destination matches, update value
                 target[field] = source[field]
             }
-            else {
+            else if(typeof target[field] === 'undefined'){  //destination is not defined
                 if(allowChanges){
-                    //console.log(`New entry:`, path.join('>'), ':', source[field])
-                    //if(printDebug)console.log('updateObject:change', path.join(' > ') + ': ' + source[field])
-                    target[field] = source[field]
-                }
-                else{
-                    console.error('Update denied', path.join('>'), ':', source[field])
-                }
+                    //target[field] = source[field]
+                    target[field] = getOperand(source[field])
+                    updateObject(target[field], source[field], allowChanges, path)
+                } else { console.error('some error message about blocking config changes') }
             }
         })
     }else{
-        console.error('Unable to update config object: Fields are empty')
+        console.error(`Unable to update config object '${path.join('/')}' with value '${source}'`)
     }
+    for(const update of updates){
+        if(printDebug.includes('update'))console.log('update: ' + update.route + ': ' + update.data)
+        config.update.emit(update.route, update.data)
+    }    
 }
+
 
 //function to update configuration object with boolean to allow making changes to the structure
 function configUpdate(id, update, bAllowChanges = false){
@@ -177,7 +199,7 @@ config.get = (path) => {
         let current = datastorage[store_id]
         //traverse to branch following the path array(skipping 0 as it is storage indicator)
         path.forEach((ref, i) => { if(i)current = current[ref] } )
-        if(printDebug)console.log('config.get', path.join(' > ') + ': ' + current)
+        if(printDebug.includes('get'))console.log('config.get', path.join(' > ') + ': ' + current)
 
         const returnvalue = current
         return returnvalue
@@ -209,7 +231,9 @@ function setCheck(path, value){
 config.set = (path, value) => {
     //remove target storage from path
     const store_id = path[0]
-    if(printDebug)console.log('config.set', path.join(' > '),' : ' , (typeof value === 'object') ? JSON.stringify(value) : value)
+    if(printDebug.includes('set'))console.log('config.set', path.join(' > '),' : ' , (typeof value === 'object') ? JSON.stringify(value) : value)
+    
+    
 
     if(setCheck(path, value) && datastorage[store_id]){
         //travel the path backwards, starting from furthest branch of json tree  
@@ -219,9 +243,6 @@ config.set = (path, value) => {
 
         //only allow structural changes to storages that don't get written to file
         configUpdate(store_id, current, (!datastorage[store_id].filepath))
-
-        //signal changes to configuration
-        for(const p of path){ config.update.emit(p, path, value) }
     } 
 }
 
@@ -235,7 +256,7 @@ config.delete = (path) => {
         //while (path.length > 1){ parent = parent[path.shift()] }
         path.forEach((ref, i) => { if(i && ref !== prop)current = current[ref] } )
         if(current[prop]){
-            if(printDebug)console.log('config.delete', path.join(' > '))
+            if(printDebug.includes('delete'))console.log('config.delete', path.join(' > '))
             delete current[prop]
         }
         else {
@@ -243,6 +264,7 @@ config.delete = (path) => {
         }
     }
 }
+
 
 newStorage('config', config_path, configTemplate)
 newStorage('local', null, {})
