@@ -34,7 +34,7 @@ function removeWorker(device){
 }
 
 wsmanager.start = () => {
-    const wsport = config.get(['config', 'User', 'WebsocketPort'])
+    const wsport = config.get('config/User/WebsocketPort')
     try{
         wss = new WebSocketServer({ port: wsport, perMessageDeflate: false })
         
@@ -61,7 +61,8 @@ config.update.on('WebsocketPort', (path, value) => {
 })
 
 config.update.on('Devices', (value) => {
-    console.log(value)
+    //console.log('New Devices Event:')
+    
 })
 
 //config.update.on('Devices', (path, value) => console.log('Devices update:', path.join('>'), ':', value))

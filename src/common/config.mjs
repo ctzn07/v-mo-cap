@@ -37,23 +37,17 @@ const configTemplate = {
     Devices: {}, 
     Tracking: {
         Face: {
-            Filepath: '', 
             Hardware: 'GPU',    //options: 'CPU', 'GPU'
             TrackingConfidence: 0.5, 
         }, 
         Hand: {
-            Filepath: '', 
             Hardware: 'GPU',    //options: 'CPU', 'GPU'
             TrackingConfidence: 0.5, 
         }, 
         Body: {
-            Filepath: '', 
             Hardware: 'GPU',    //options: 'CPU', 'GPU'
             TrackingConfidence: 0.5, 
-        }, 
-        WebAssembly: {
-            Filepath: ''
-        }
+        },
     },
     User: { 
         WebsocketPort: 8080, 
@@ -63,23 +57,23 @@ const configTemplate = {
 
 const datastorage = {}
 
-function newStorage(id, filepath = null, template){
-    console.log(`Initiating new ${id} storage`)
-    datastorage[id] = {filepath: filepath}
-    if(filepath && fs.existsSync(filepath)){
-        console.log(`File for ${id} already exists, loading...`)
-        const data = JSON.parse(fs.readFileSync(filepath, { encoding: 'utf-8', JSON: true }))
-        Object.assign(datastorage[id], data)
-    }
-    else {
-        if(template){
-            console.log(`Creating new file for storage ${id}...`)
+function newStorage(id, path = null, template){
+    console.log(`New storage: ${id}`)
+    datastorage[id] = {filepath: path}
+    if(path){   //filepath was supplied, check file
+        if(fs.existsSync(path)){    //file exists, load 
+            console.log(`File for ${id} exists, loading...`)
+            const data = JSON.parse(fs.readFileSync(path, { encoding: 'utf-8', JSON: true }))
+            Object.assign(datastorage[id], data)
+        }
+        else{   //no file exists, write new one
+            console.log(`Creating new file for ${id}...`)
             Object.assign(datastorage[id], template)
             writeFile(id)
         }
-        else{
-            console.error(`New storage ${id} initiated, but no template supplied`)
-        }
+    }
+    else {  //no filepath, consider it a temporary storage
+        Object.assign(datastorage[id], template || {})
     }
 }
 
@@ -102,40 +96,15 @@ function writeFile(store_id){
     }
 }
 
-function getType(a){
-    console.log(typeof a)
-    switch (typeof a) {
-        case 'object':
-            //return new Object()
-            return {}
-        case 'boolean':
-            //return new Boolean()
-            return false
-        case 'number':
-            //return new Number()
-            return 0
-        case 'bigint':
-            //return new BigInt()
-            return 0
-        case 'string':
-            //return new String()
-            return ''
-        case 'symbol':
-            //return new Symbol()
-            return {}
-        default:
-            return null
-    }
-}
-
 //updates existing object with partial object that matches to the target structure.
 const updateObject = (target, source, allowChanges, path = []) => {
-    const updates = []
     if(typeof source !== 'undefined'){
         //iterate over all json fields
-        Object.keys(source).forEach(field => {  
+        Object.keys(source).forEach(field => {
             path.push(field)
-            updates.push({route: path.join('/'), data: source[field]})
+            //note: event emit shouldn't happen before the variable is actually updated
+            config.update.emit(path.join('/'), source[field])
+            console.log('EMITTING', path.join('/'))
 
             if(target[field] && typeof target[field] === 'object'){ //destination is object, dig deeper
                 updateObject(target[field], source[field], allowChanges, path)
@@ -145,28 +114,23 @@ const updateObject = (target, source, allowChanges, path = []) => {
             }
             else if(typeof target[field] === 'undefined'){  //destination is not defined
                 if(allowChanges){
-                    //target[field] = source[field]
-
-                    //target[field] = getOperand(source[field])
-                    //updateObject(target[field], source[field], allowChanges, path)
-
-                    if(typeof source[field] !== 'object'){
+                    //this plainly overrides the missing objects, but that also skips emitter events
+                    //target[field] = source[field]     
+                    //solution: create the path on the fly
+                    
+                    if(typeof source[field] !== 'object'){  //not-object means it's a value
                         target[field] = source[field]
-                    }else{
+                    }
+                    else{   //nothing found at the path, create object to the path and continue
                         target[field] = {}
                         updateObject(target[field], source[field], allowChanges, path)
-                    }
-                    
-                } else { console.error('some error message about blocking config changes') }
+                    }    
+                } else { console.error(`Config structural changes are not allowed in '${path.join('/')}'`) }
             }
         })
     }else{
         console.error(`Unable to update config object '${path.join('/')}' with value '${source}'`)
     }
-    for(const update of updates){
-        if(printDebug.includes('update'))console.log('update: ' + update.route + ': ' + update.data)
-        config.update.emit(update.route, update.data)
-    }    
 }
 
 
@@ -207,23 +171,16 @@ config.devicelist = (list) => {
 }
 
 config.get = (path) => {
-    //remove target storage from path
-    const store_id = path[0]
-    //console.log('config.get', path.join(' > '))
-    if(datastorage[store_id]){
-        //set current ref to object root
-        let current = datastorage[store_id]
-        //traverse to branch following the path array(skipping 0 as it is storage indicator)
-        path.forEach((ref, i) => { if(i)current = current[ref] } )
-        if(printDebug.includes('get'))console.log('config.get', path.join(' > ') + ': ' + current)
+    //const route = path.includes('/') ? path.split('/') : [path]
+    const route = path.split ? path.split('/') : [path]
+    let current = datastorage
+    
+    route.forEach((ref) => { current = current[ref] } )
+    if(printDebug.includes('get'))console.log('config.get', path + ': ' + current)
 
-        const returnvalue = current
-        return returnvalue
-    }
-    else{
-        console.error(`config.get - unknown storage path: ${store_id}`)
-        return {}
-    }
+    const returnvalue = current || {}
+    return returnvalue
+    
 }
 
 function setCheck(path, value){
@@ -239,23 +196,28 @@ function setCheck(path, value){
         console.error('config.set - no path provided')
         return false
     }
+    if(false){
+        //TODO: check if value set could be skipped when existing value is the same as new
+        //this would greatly reduce config event emits
+        console.error('config.set - value is the same')
+        return false
+    }  
     else {
         return true
     }
 }
 
 config.set = (path, value) => {
-    //remove target storage from path
-    const store_id = path[0]
-    if(printDebug.includes('set'))console.log('config.set', path.join(' > '),' : ' , (typeof value === 'object') ? JSON.stringify(value) : value)
-    
-    
+    const route = path.split('/') 
+    const store_id = route[0]
+    if(printDebug.includes('set'))console.log('config.set', path,' : ' , (typeof value === 'object') ? JSON.stringify(value) : value)
 
-    if(setCheck(path, value) && datastorage[store_id]){
+
+    if(setCheck(route, value) && datastorage[store_id]){
         //travel the path backwards, starting from furthest branch of json tree  
-        let current = { [path.at(-1)]: value }
+        let current = { [route.at(-1)]: value }
         //recursive branch wrap
-        for(let i = path.length - 2; i >= 1; i--){ current = { [path[i]]: current } }
+        for(let i = route.length - 2; i >= 1; i--){ current = { [route[i]]: current } }
 
         //only allow structural changes to storages that don't get written to file
         configUpdate(store_id, current, (!datastorage[store_id].filepath))
@@ -263,16 +225,17 @@ config.set = (path, value) => {
 }
 
 config.delete = (path) => {
-    const store_id = path[0]
+    const route = path.split('/')
+    const store_id = route[0]
     // Only allow structural changes to storages that don't get written to file
     if (!datastorage[store_id].filepath && store_id) {
         let current = datastorage[store_id]
-        let prop = path.at(-1)
+        let prop = route.at(-1)
         // Traverse to the parent of the property to delete
         //while (path.length > 1){ parent = parent[path.shift()] }
-        path.forEach((ref, i) => { if(i && ref !== prop)current = current[ref] } )
+        route.forEach((ref, i) => { if(i && ref !== prop)current = current[ref] } )
         if(current[prop]){
-            if(printDebug.includes('delete'))console.log('config.delete', path.join(' > '))
+            if(printDebug.includes('delete'))console.log('config.delete', path)
             delete current[prop]
         }
         else {
@@ -281,21 +244,5 @@ config.delete = (path) => {
     }
 }
 
-
 newStorage('config', config_path, configTemplate)
-newStorage('local', null, {})
-
-//update filepaths in config to match current app location
-config.set(['config', 'Tracking', 'Face', 'Filepath'], path.join(asset_path, 'face_landmarker.task'))
-config.set(['config', 'Tracking', 'Hand', 'Filepath'], path.join(asset_path, 'hand_landmarker.task'))
-config.set(['config', 'Tracking', 'Body', 'Filepath'], path.join(asset_path, 'pose_landmarker.task'))
-config.set(['config', 'Tracking', 'WebAssembly', 'Filepath'], path.join(asset_path, '/wasm/'))
-
-//returns status of hardware acceleration
-config.hwAcc = () => {
-    return [
-        config.get(['config', 'Tracking', 'Face', 'Hardware']), 
-        config.get(['config', 'Tracking', 'Hand', 'Hardware']), 
-        config.get(['config', 'Tracking', 'Body', 'Hardware']), 
-      ].includes('GPU')
-}
+newStorage('session', null, {})
