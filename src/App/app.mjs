@@ -23,7 +23,7 @@ function updateDevices(list){
     config.devicelist(list)
     const newList = new Set(list)
 
-    const oldList = new Set(Object.keys(config.get('session/Devices')))
+    const oldList = new Set(Object.keys(config.get('session/Devices') || {}))
     
         for(const device of newList.union(oldList)){
             config.set(`session/Devices/${device}/Available`, newList.has(device))

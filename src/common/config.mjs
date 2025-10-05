@@ -7,7 +7,7 @@ import { isDev } from './util.mjs'
 import { console } from './logger.mjs'
 
 //options: get, set, delete, update
-const printDebug = ['get', 'set']
+const printDebug = ['set'] //'set', 'get', 'delete'
 
 //TODO: fix non-dev root path
 const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
@@ -98,12 +98,13 @@ function writeFile(store_id){
 
 //updates existing object with partial object that matches to the target structure.
 const updateObject = (target, source, allowChanges, path = []) => {
-    if(typeof source !== 'undefined'){
+    if(typeof source !== 'undefined'){  //BUG: something about this prevents saving websocket to session storage
         //iterate over all json fields
         Object.keys(source).forEach(field => {
             path.push(field)
             //to prevent emitter data race condition, save path before making changes
             const emitPath = path.join('/')
+            const emitValue = source[field]
 
             if(printDebug.includes('update'))console.log('update', path.join('/') + ': ' + source[field])
 
@@ -124,7 +125,7 @@ const updateObject = (target, source, allowChanges, path = []) => {
                 } else { console.error(`Config structural changes are not allowed in '${path.join('/')}'`) }
             }
         //emit object updates
-        config.update.emit(emitPath, source[field])
+        config.update.emit(emitPath, emitValue)
         })
     }else{
         console.error(`Unable to update config object '${path.join('/')}' with value '${source}'`)
@@ -176,7 +177,8 @@ config.get = (path) => {
     route.forEach((ref) => { current = current[ref] } )
     if(printDebug.includes('get'))console.log('config.get', path + ': ' + current + `(${typeof current})`)
 
-    const returnvalue = (typeof current === 'undefined') ? {} : current
+    //const returnvalue = (typeof current === 'undefined') ? {} : current
+    const returnvalue = current
     return returnvalue
     
 }

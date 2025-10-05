@@ -17,7 +17,7 @@ function createGUI(params){
     }, 
     autoHideMenuBar: true, 
     show: isDev(), 
-    title: `VMC Worker(${params.device})`, 
+    title: `VMC Worker(${params.token})`, 
   })
   //todo: check is path right for production
   const htmlpath = path.join(app.getAppPath() + '/dist/worker.html')
@@ -27,7 +27,7 @@ function createGUI(params){
   //page has finished loading
   win.webContents.on('did-finish-load', () => {
     //connect to main process using websocket
-    const ws = new WebSocket(`ws://localhost:${params.port}`, {perMessageDeflate: false})
+    const ws = new WebSocket(`ws://localhost:${params.port}/${params.token}`, {perMessageDeflate: false})
     const send = (channel, packet) => ws.send(JSON.stringify(params))
     
     //Events from main process
