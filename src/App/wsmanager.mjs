@@ -60,8 +60,8 @@ config.update.on('WebsocketPort', (path, value) => {
     wsmanager.start()
 })
 
-config.update.on('Devices', (value) => {
-    //console.log('New Devices Event:')
+config.update.on('session/Devices', (value) => {
+    console.log('New Devices Event:')
     
 })
 

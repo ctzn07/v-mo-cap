@@ -7,7 +7,7 @@ import { isDev } from './util.mjs'
 import { console } from './logger.mjs'
 
 //options: get, set, delete, update
-const printDebug = []
+const printDebug = ['get', 'set']
 
 //TODO: fix non-dev root path
 const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
@@ -102,43 +102,41 @@ const updateObject = (target, source, allowChanges, path = []) => {
         //iterate over all json fields
         Object.keys(source).forEach(field => {
             path.push(field)
-            //note: event emit shouldn't happen before the variable is actually updated
-            config.update.emit(path.join('/'), source[field])
-            console.log('EMITTING', path.join('/'))
+            //to prevent emitter data race condition, save path before making changes
+            const emitPath = path.join('/')
 
-            if(target[field] && typeof target[field] === 'object'){ //destination is object, dig deeper
-                updateObject(target[field], source[field], allowChanges, path)
-            }
-            else if(typeof target[field] === typeof source[field]){ //destination matches, update value
-                target[field] = source[field]
-            }
-            else if(typeof target[field] === 'undefined'){  //destination is not defined
-                if(allowChanges){
-                    //this plainly overrides the missing objects, but that also skips emitter events
-                    //target[field] = source[field]     
-                    //solution: create the path on the fly
-                    
-                    if(typeof source[field] !== 'object'){  //not-object means it's a value
-                        target[field] = source[field]
-                    }
-                    else{   //nothing found at the path, create object to the path and continue
+            if(printDebug.includes('update'))console.log('update', path.join('/') + ': ' + source[field])
+
+            //destination is object, dig deeper
+            if(target[field] && typeof target[field] === 'object'){ updateObject(target[field], source[field], allowChanges, path) }
+            //destination matches, update value
+            else if(typeof target[field] === typeof source[field]){ target[field] = source[field] }
+            //destination is not undefined
+            else if(typeof target[field] === 'undefined'){ 
+                if(allowChanges){ 
+                    //not-object means it's a value
+                    if(typeof source[field] !== 'object'){ target[field] = source[field] }
+                    //nothing found at the path, extend path with empty object and continue
+                    else{ 
                         target[field] = {}
-                        updateObject(target[field], source[field], allowChanges, path)
+                        updateObject(target[field], source[field], allowChanges, path) 
                     }    
                 } else { console.error(`Config structural changes are not allowed in '${path.join('/')}'`) }
             }
+        //emit object updates
+        config.update.emit(emitPath, source[field])
         })
     }else{
         console.error(`Unable to update config object '${path.join('/')}' with value '${source}'`)
     }
+    
 }
 
 
 //function to update configuration object with boolean to allow making changes to the structure
 function configUpdate(id, update, bAllowChanges = false){
-    //console.log('configUpdate', id, 'allow changes:', bAllowChanges, ' data:', update)
-    if(datastorage[id] && typeof update === 'object'){
-        updateObject(datastorage[id], update, bAllowChanges)
+    if(typeof update === 'object'){
+        updateObject(datastorage, update, bAllowChanges)
         writeFile(id)
     }
     else {
@@ -176,9 +174,9 @@ config.get = (path) => {
     let current = datastorage
     
     route.forEach((ref) => { current = current[ref] } )
-    if(printDebug.includes('get'))console.log('config.get', path + ': ' + current)
+    if(printDebug.includes('get'))console.log('config.get', path + ': ' + current + `(${typeof current})`)
 
-    const returnvalue = current || {}
+    const returnvalue = (typeof current === 'undefined') ? {} : current
     return returnvalue
     
 }
@@ -208,16 +206,14 @@ function setCheck(path, value){
 }
 
 config.set = (path, value) => {
-    const route = path.split('/') 
+    const route = path.split ? path.split('/') : [path]
     const store_id = route[0]
     if(printDebug.includes('set'))console.log('config.set', path,' : ' , (typeof value === 'object') ? JSON.stringify(value) : value)
 
-
     if(setCheck(route, value) && datastorage[store_id]){
-        //travel the path backwards, starting from furthest branch of json tree  
-        let current = { [route.at(-1)]: value }
-        //recursive branch wrap
-        for(let i = route.length - 2; i >= 1; i--){ current = { [route[i]]: current } }
+        //build update object in reverse, starting from value
+        let current = value
+        while(route.length){ current = {[route.pop()]: current} }
 
         //only allow structural changes to storages that don't get written to file
         configUpdate(store_id, current, (!datastorage[store_id].filepath))

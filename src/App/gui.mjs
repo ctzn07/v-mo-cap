@@ -79,11 +79,11 @@ return [
 function injectValues(frame){
 frame.children.forEach(child => {
     if(child.path){
-    const value = config.get(child.path)
-    child.value = value
+        const value = config.get(child.path)
+        child.value = value
     }
-})
-return frame
+    })
+    return frame
 }
 
 gui.devices = () => {   //Note: list is an array of device labels
