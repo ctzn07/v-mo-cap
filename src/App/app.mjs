@@ -26,17 +26,15 @@ function updateDevices(list){
     const oldList = new Set(Object.keys(devicesObj))
 
     for(const device of newList.union(oldList)){
-        if(newList.has(device)){
-            if(!devicesObj[device] || devicesObj[device].Available === false){
-                config.set(`session/Devices/${device}/Available`, true)
-            }
-        }
-        else{
-            config.set(`session/Devices/${device}/Available`, false)
+        if(devicesObj[device] && devicesObj[device].Available === true){
+            if(!newList.has(device)){ config.set(`session/Devices/${device}/Available`, false) }
+        }else{
+            if(newList.has(device)){ config.set(`session/Devices/${device}/Available`, true) }
         }
     }
-    
 }
+
+//config.set(`session/Devices/${device}/Available`, false)
 
 function createGUI(){
     const win = new BrowserWindow({

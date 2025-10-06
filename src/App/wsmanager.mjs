@@ -88,22 +88,15 @@ wsmanager.start = () => {
 wsmanager.stop = (msg = '') => { wss.close(() => console.log('WSS closed:', msg)) }
 
 //if websocket port changes, restart server
-config.update.on('WebsocketPort', (path, value) => {
+config.update.on('config/User/WebsocketPort', (value) => {
     //TODO: reconnect all devices
     wsmanager.stop(`config changed, restarting`)
     wsmanager.start()
 })
 
 config.update.on('session/Devices', (value) => {
-    const Devices = config.get('session/Devices')
-    
-    for(const d of Object.keys(Devices)){
-        //console.log(d, ': ', Devices[d].Available)
-        
-        //if(!wsMap.has(d))createWorker(d)
-        //if(wsMap.has(d))removeWorker(d)
-    }
-    console.log('session/Devices ----------------------------------')
+    const device = Object.keys(value)[0]
+    value[device].Available ? createWorker(device) : removeWorker(device)
 })
 
 //1001	Going Away
