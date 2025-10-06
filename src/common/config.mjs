@@ -7,7 +7,7 @@ import { isDev } from './util.mjs'
 import { console } from './logger.mjs'
 
 //options: get, set, delete, update
-const printDebug = ['set'] //'set', 'get', 'delete'
+const printDebug = [] //'set', 'get', 'delete'
 
 //TODO: fix non-dev root path
 const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
@@ -145,27 +145,23 @@ function configUpdate(id, update, bAllowChanges = false){
     }
 }
 
-function generateDevice(label){
-    return {
-        label: label,
-        id: crypto.randomUUID().split('-')[0], 
-        Face: false, 
-        Body: false, 
-        Hand: false, 
-        Calibration: {
-            Loc: {x: 0, y: 0, z: 0}, 
-            Rot: {x: 0, y: 0, z: 0}, 
-            Lens: {k1: 0, k2: 0, k3: 0, centerX: 0.5, centerY: 0.5}
-        } 
-    }
-}
-
-//generate device entry to config
+//special function to override safety checks to make sure new devices always have config entry
 config.devicelist = (list) => {
     for(const label of list){
         if(!datastorage['config'].Devices[label]){  //no entry for device exists, generate new one
             //configUpdate('config', { Devices: { [label]: generateDevice(label) } }, true)
-            datastorage['config'].Devices[label] = generateDevice(label)
+            datastorage['config'].Devices[label] = {
+                label: label,
+                id: crypto.randomUUID().split('-')[0], 
+                Face: false, 
+                Body: false, 
+                Hand: false, 
+                Calibration: {
+                    Loc: {x: 0, y: 0, z: 0}, 
+                    Rot: {x: 0, y: 0, z: 0}, 
+                    Lens: {k1: 0, k2: 0, k3: 0, centerX: 0.5, centerY: 0.5}
+                } 
+            }
             writeFile('config')
         }
     }
@@ -227,7 +223,6 @@ config.set = (path, value) => {
 config.delete = (path) => {
     const route = path.split('/')
     const store_id = route[0]
-    const emitpath = []
     // Only allow structural changes to storages that don't get written to file
     if (!datastorage[store_id].filepath && store_id) {
         let current = datastorage[store_id]

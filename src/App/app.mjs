@@ -20,7 +20,7 @@ function updateUI(channel, data = null){
 }
 
 function updateDevices(list){
-    config.devicelist(list)
+    config.devicelist(list)     //special function that makes sure all devices have config entry
     const devicesObj = config.get('session/Devices') || {}
     const newList = new Set(list)
     const oldList = new Set(Object.keys(devicesObj))
@@ -34,18 +34,16 @@ function updateDevices(list){
     }
 }
 
-//config.set(`session/Devices/${device}/Available`, false)
-
 function createGUI(){
     const win = new BrowserWindow({
-        width: 1200,
-        height: 600, 
+        width: 1000,
+        height: 900, 
         minWidth: 500, 
         minHeight: 500, 
         webPreferences: {
-        //todo: check is path right for production
-        preload: path.join(app.getAppPath() + '/src/common/api.mjs'),
-        sandbox: false,   //preloading .mjs is not compatible with sandboxing
+            //todo: check is path right for production
+            preload: path.join(app.getAppPath() + '/src/common/api.mjs'),
+            sandbox: false,   //preloading .mjs is not compatible with sandboxing
         },
         autoHideMenuBar: true,
     })

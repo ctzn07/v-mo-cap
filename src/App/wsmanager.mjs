@@ -28,7 +28,7 @@ const io_logger = (error, stdout, stderr) => {
 
 const newConnection = (ws, token) => {
     const device = tokenMap.get(token)
-    if(tokenMap.has(token) && wsMap.has(device)){  
+    if(tokenMap.has(token) && wsMap.has(device)){ 
         //incoming events
         ws.on('message', (data, isBinary) => wsMap.get(device).emit('message', data, isBinary))
         ws.on('error', (e) => console.error(device, ': ', e))
@@ -94,9 +94,9 @@ config.update.on('config/User/WebsocketPort', (value) => {
     wsmanager.start()
 })
 
-config.update.on('session/Devices', (value) => {
-    const device = Object.keys(value)[0]
-    value[device].Available ? createWorker(device) : removeWorker(device)
+config.update.on('session/Devices', (Device) => {
+    const label = Object.keys(Device)[0]
+    Device[label].Available ? createWorker(label) : removeWorker(label)
 })
 
 //1001	Going Away

@@ -15,7 +15,7 @@ body {
   --secondary-color: #4e4e4e;
   --accent-color: #ffa126;
   --text-color: #f0ebeb;
-  --border-radius: 5px;
+  --border-radius: 8px;
   --tab-width: 64px;
   --toggle-size: 32px;
 
@@ -52,7 +52,6 @@ a {
   background-color: transparent;
   position: fixed;
   padding: var(--main-spacing);
-  height: 100%;
   z-index: 2;
 }
 
@@ -71,6 +70,7 @@ a {
   max-height: var(--tab-width);
   white-space: wrap;
   border-radius: var(--border-radius);
+  transition: all 0.2s;
 }
 
 .button_large:hover {
@@ -97,7 +97,6 @@ a {
   width: 100vw;
   height: 100vh;
   padding: var(--main-spacing);
-  padding-left: calc(var(--tab-width) + var(--main-spacing) * 2);
   opacity: 0;
   overflow: auto;
 }
@@ -107,12 +106,14 @@ a {
   min-height: var(--tab-width);
   max-height: fit-content;
   /*overflow: hidden;*/
-  border-bottom: solid 1px var(--secondary-color);
+  border: solid 2px var(--secondary-color);
   vertical-align: text-top;
   text-wrap: nowrap;
-  /*border-radius: var(--border-radius);*/
+  border-radius: var(--border-radius);
   padding: var(--main-spacing);
   position: relative;
+  margin-left: calc(var(--tab-width) + var(--main-spacing) * 2);
+  margin-bottom: var(--main-spacing);
 }
 
 .frame_content {
