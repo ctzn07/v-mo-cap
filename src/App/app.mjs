@@ -21,13 +21,21 @@ function updateUI(channel, data = null){
 
 function updateDevices(list){
     config.devicelist(list)
+    const devicesObj = config.get('session/Devices') || {}
     const newList = new Set(list)
+    const oldList = new Set(Object.keys(devicesObj))
 
-    const oldList = new Set(Object.keys(config.get('session/Devices') || {}))
-    
-        for(const device of newList.union(oldList)){
-            config.set(`session/Devices/${device}/Available`, newList.has(device))
+    for(const device of newList.union(oldList)){
+        if(newList.has(device)){
+            if(!devicesObj[device] || devicesObj[device].Available === false){
+                config.set(`session/Devices/${device}/Available`, true)
+            }
         }
+        else{
+            config.set(`session/Devices/${device}/Available`, false)
+        }
+    }
+    
 }
 
 function createGUI(){

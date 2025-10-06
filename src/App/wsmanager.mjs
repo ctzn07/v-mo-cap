@@ -52,7 +52,9 @@ const newConnection = (ws, token) => {
 }
 
 function createWorker(device){
-    if(!wsMap.has(device)){
+    console.log('creating worker ', device)
+    wsMap.set(device, {})
+    if(false){
         wsMap.set(device, new WSEmitter())
         console.log(`no previous connection found for ${device}, creating new...`)
 
@@ -60,11 +62,15 @@ function createWorker(device){
         tokenMap.set(token, device)
         setTimeout(() => tokenMap.delete(token), 3000)
 
-        const port = config.get('config/User/WebsocketPort')
-        if(isDev()){ exec(`npm run worker worker=true port=${port} token="${token}"`, (...args) => io_logger(...args)) }
+        if(isDev()){ exec(`npm run worker worker="true" port="${wss.address().port}" token="${token}"`, (...args) => io_logger(...args)) }
         else{ console.error('wsmanager.mjs - Worker spawning not set up for production') }
     }
-    else{ console.log(`${device} already has an active connection, aborting`) }
+    //else{ console.log(`${device} already has an active connection, aborting`) }
+}
+
+function removeWorker(device){
+    wsMap.delete(device)
+    console.log('removing worker ', device)
 }
 
 wsmanager.start = () => {
@@ -88,14 +94,16 @@ config.update.on('WebsocketPort', (path, value) => {
     wsmanager.start()
 })
 
-config.update.on('session/Devices', (Devices) => {
-    //const Devices = config.get('session/Devices')
+config.update.on('session/Devices', (value) => {
+    const Devices = config.get('session/Devices')
+    
     for(const d of Object.keys(Devices)){
-        //device is available but has no connection
-        if(Devices[d].Available === true && !wsMap.has(d)){ createWorker(d) }
-        //device is not available anymore but has connection
-        if(Devices[d].Available === false && wsMap.has(d)){ wsMap.get(d).emit('disconnect', 1000, 'Device disconnected') }
+        //console.log(d, ': ', Devices[d].Available)
+        
+        //if(!wsMap.has(d))createWorker(d)
+        //if(wsMap.has(d))removeWorker(d)
     }
+    console.log('session/Devices ----------------------------------')
 })
 
 //1001	Going Away

@@ -104,8 +104,8 @@ const updateObject = (target, source, allowChanges, path = []) => {
             path.push(field)
             //to prevent emitter data race condition, save path before making changes
             const emitPath = path.join('/')
-            const emitValue = source[field]
-
+            const emitvalue = source[field]
+            
             if(printDebug.includes('update'))console.log('update', path.join('/') + ': ' + source[field])
 
             //destination is object, dig deeper
@@ -125,7 +125,7 @@ const updateObject = (target, source, allowChanges, path = []) => {
                 } else { console.error(`Config structural changes are not allowed in '${path.join('/')}'`) }
             }
         //emit object updates
-        config.update.emit(emitPath, emitValue)
+        config.update.emit(emitPath, emitvalue)
         })
     }else{
         console.error(`Unable to update config object '${path.join('/')}' with value '${source}'`)
@@ -164,7 +164,9 @@ function generateDevice(label){
 config.devicelist = (list) => {
     for(const label of list){
         if(!datastorage['config'].Devices[label]){  //no entry for device exists, generate new one
-            configUpdate('config', { Devices: { [label]: generateDevice(label) } }, true)
+            //configUpdate('config', { Devices: { [label]: generateDevice(label) } }, true)
+            datastorage['config'].Devices[label] = generateDevice(label)
+            writeFile('config')
         }
     }
 }
@@ -225,13 +227,14 @@ config.set = (path, value) => {
 config.delete = (path) => {
     const route = path.split('/')
     const store_id = route[0]
+    const emitpath = []
     // Only allow structural changes to storages that don't get written to file
     if (!datastorage[store_id].filepath && store_id) {
         let current = datastorage[store_id]
         let prop = route.at(-1)
         // Traverse to the parent of the property to delete
         //while (path.length > 1){ parent = parent[path.shift()] }
-        route.forEach((ref, i) => { if(i && ref !== prop)current = current[ref] } )
+        route.forEach((ref, i) => { if(i && ref !== prop){ current = current[ref] }})
         if(current[prop]){
             if(printDebug.includes('delete'))console.log('config.delete', path)
             delete current[prop]
