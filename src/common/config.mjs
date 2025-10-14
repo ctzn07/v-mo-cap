@@ -5,10 +5,9 @@ import path from 'node:path'
 import EventEmitter from 'node:events'
 import { isDev } from './util.mjs'
 import { console } from './logger.mjs'
-import { get } from 'node:http'
 
 //options: get, set, delete, update
-const printDebug = ['set', 'get'] //'set', 'get', 'delete'
+const printDebug = [] //'set', 'get', 'emit'
 
 //TODO: fix non-dev root path
 const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
@@ -54,10 +53,6 @@ const configTemplate = {
         WebsocketPort: 8080, 
         PreferredGPU: 'dGPU',   //options: 'dGPU', 'iGPU'
     }, 
-}
-
-const sessionTemplate = {
-    Devices: [],
 }
 
 const datastorage = {}
@@ -126,28 +121,37 @@ config.devicelist = (list) => {
     config.set('session/Devices', list)
 }
 
-const getRef = (array) => { return array.reduce((r, c) => r[c], datastorage) }
+function cleanRoute(path){
+    const route = path.split ? path.split('/') : [path]
+    if(!route.at(-1))route.pop()    //remove trailing '/'
+    return route
+}
 
-const setRef = (route, value) => {
+const getRef = (path) => {
+    const route = cleanRoute(path)
+    const target = route.pop()
+    const ref = route.reduce((r, c) => r[c], datastorage)
+    return ref[target]
+}
+
+const setRef = (path, value) => {
+    const route = cleanRoute(path)
     const target = route.pop()
     const ref = route.reduce((r, c) => r[c] ? r[c] : r[c] = {}, datastorage)
     ref[target] = value
 }
 
 config.get = (path) => {
-    const route = path.split ? path.split('/') : [path]
-    if(!route.at(-1))route.pop()    //remove trailing '/'
-    if(!route.length){
-        console.error('Fetch: Empty path or storage root access attempted')
+    const current = getRef(path)
+
+    if(typeof current !== 'undefined'){
+        if(printDebug.includes('get'))console.log(`config.get ${path}: ${current}(${typeof current})`)
+        return current
+    }
+    else{
+        console.error(`Failed to get config value( ${path} : ${current})`)
         return null
     }
-    const current = getRef(route)
-
-    if(current){
-        if(printDebug.includes('get'))console.log(`config.get ${path}: ${current}(${typeof current})`)
-    }
-    else{ console.error(`Failed to get config value(${path})`) }
-    return current
 }
 
 /*
@@ -161,25 +165,18 @@ config.get = (path) => {
 */
 
 config.set = (path, value) => {
-    const route = path.split ? path.split('/') : [path]
-    if(!route.at(-1))route.pop()    //remove trailing '/'
-    const emitroute = path.split ? path.split('/') : [path]
-    if(!emitroute.at(-1))emitroute.pop()    //remove trailing '/'
-    
-    console.log(`Config.SET: ${route.join('-')}:${value}`)
-    
-    setRef(route, value)
-    const current = getRef()
+    setRef(path, value)
 
-    //writeFile(route.at(0))
-
+    const current = getRef(path)
     if(printDebug.includes('set'))console.log(`config.set ${path}: ${current}(${typeof current})`)
-    while(emitroute.length){
-        console.log('EMIT', emitroute.join('/'))
-        config.update.emit(emitroute.join('/'))
-        emitroute.pop()
+
+    const route = cleanRoute(path)
+    writeFile(route.at(0))
+    while(route.length){
+        if(printDebug.includes('emit')){ console.log('config.update.emit', route.join('/')) }
+        config.update.emit(route.join('/'))
+        route.pop()
     }
-    console.log(JSON.stringify(datastorage['session']))
 }
 //if(route.length === 4)datastorage[route[0]][route[1]][route[2]][route[3]] = value
 
@@ -188,5 +185,4 @@ config.delete = (path) => {
 }
 
 newStorage('config', config_path, configTemplate)
-//newStorage('session', null, sessionTemplate)
 newStorage('session', null, {})
