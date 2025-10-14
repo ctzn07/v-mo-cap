@@ -5,6 +5,7 @@ import path from 'node:path'
 import EventEmitter from 'node:events'
 import { isDev } from './util.mjs'
 import { console } from './logger.mjs'
+import { get } from 'node:http'
 
 //options: get, set, delete, update
 const printDebug = ['set', 'get'] //'set', 'get', 'delete'
@@ -55,6 +56,10 @@ const configTemplate = {
     }, 
 }
 
+const sessionTemplate = {
+    Devices: [],
+}
+
 const datastorage = {}
 
 function newStorage(id, path = null, template){
@@ -96,54 +101,6 @@ function writeFile(store_id){
     }
 }
 
-//updates existing object with partial object that matches to the target structure.
-
-const updateObject = (target, source, allowChanges, path = []) => {
-    if(typeof source !== 'undefined'){  //BUG: something about this prevents saving websocket to session storage
-        //iterate over all json fields
-        Object.keys(source).forEach(field => {
-            path.push(field)
-            //to prevent emitter data race condition, save path before making changes
-            const emitPath = path.join('/')
-            const emitvalue = source[field]
-            
-            if(printDebug.includes('update'))console.log('update', path.join('/') + ': ' + source[field])
-
-            //destination is object, dig deeper
-            if(target[field] && typeof target[field] === 'object'){ updateObject(target[field], source[field], allowChanges, path) }
-            //destination matches, update value
-            else if(typeof target[field] === typeof source[field]){ target[field] = source[field] }
-            //destination is not undefined
-            else if(typeof target[field] === 'undefined'){ 
-                if(allowChanges){ 
-                    //not-object means it's a value
-                    if(typeof source[field] !== 'object'){ target[field] = source[field] }
-                    //nothing found at the path, extend path with empty object and continue
-                    else{ 
-                        target[field] = {}
-                        updateObject(target[field], source[field], allowChanges, path) 
-                    }    
-                } else { console.error(`Config structural changes are not allowed in '${path.join('/')}'`) }
-            }
-        //emit object updates
-        config.update.emit(emitPath, emitvalue)
-        })
-    }else{
-        console.error(`Unable to update config object '${path.join('/')}' with value '${source}'`)
-    } 
-}
-
-//function to update configuration object with boolean to allow making changes to the structure
-function configUpdate(id, update, bAllowChanges = false){
-    if(typeof update === 'object'){
-        updateObject(datastorage, update, bAllowChanges)
-        writeFile(id)
-    }
-    else {
-        console.error(`Config Update on ${id} failed - data: ${typeof update} `)
-    }
-}
-
 //special function that overrides safety checks to make sure new devices always have config entry
 config.devicelist = (list) => {
     //check for config entries
@@ -166,87 +123,70 @@ config.devicelist = (list) => {
         }
     }
     //update available devices to session storage
-    config.delete('session/Devices/')
-    config.set('session/Devices/', list)
+    config.set('session/Devices', list)
+}
+
+const getRef = (array) => { return array.reduce((r, c) => r[c], datastorage) }
+
+const setRef = (route, value) => {
+    const target = route.pop()
+    const ref = route.reduce((r, c) => r[c] ? r[c] : r[c] = {}, datastorage)
+    ref[target] = value
 }
 
 config.get = (path) => {
     const route = path.split ? path.split('/') : [path]
+    if(!route.at(-1))route.pop()    //remove trailing '/'
+    if(!route.length){
+        console.error('Fetch: Empty path or storage root access attempted')
+        return null
+    }
+    const current = getRef(route)
+
+    if(current){
+        if(printDebug.includes('get'))console.log(`config.get ${path}: ${current}(${typeof current})`)
+    }
+    else{ console.error(`Failed to get config value(${path})`) }
+    return current
+}
+
+/*
     let current = datastorage
-    while(route.length){
-        const ref = route.shift()
-        if(current[ref]){ current = current[ref] }
-        else{
-            current = null
-            break
-        }
+    for (let i = 0; i < route.length - 1; i++) {
+        const key = route[i]
+        if (!(key in current))break
+        current = current[key]
     }
-
-    //I don't know why it is returning index:value objects instead of arrays
-    //and this index[0](&&exclude strings) check is far from optimal, but it works for now...
-    const returnvalue = current
-    if(printDebug.includes('get'))console.log('config.get', path + ': ' + returnvalue + `(${typeof returnvalue})`)
-    return returnvalue
-}
-
-function setCheck(path, value){
-    if(value === undefined){
-        console.error('config.set - missing argument: value')
-        return false
-    }
-    if(path.includes(undefined)){
-        console.error('config.set - path contains undefined')
-        return false
-    }
-    if(!path.length){
-        console.error('config.set - no path provided')
-        return false
-    }
-    if(false){
-        //TODO: check if value set could be skipped when existing value is the same as new
-        //this would greatly reduce config event emits
-        console.error('config.set - value is the same')
-        return false
-    }  
-    else {
-        return true
-    }
-}
+    current[route.at(-1)] = value
+*/
 
 config.set = (path, value) => {
     const route = path.split ? path.split('/') : [path]
-    const store_id = route[0]
-    if(printDebug.includes('set'))console.log('config.set', path,' : ' , value)
+    if(!route.at(-1))route.pop()    //remove trailing '/'
+    const emitroute = path.split ? path.split('/') : [path]
+    if(!emitroute.at(-1))emitroute.pop()    //remove trailing '/'
+    
+    console.log(`Config.SET: ${route.join('-')}:${value}`)
+    
+    setRef(route, value)
+    const current = getRef()
 
-    if(setCheck(route, value) && datastorage[store_id]){
-        //build update object in reverse, starting from value
-        let current = value
-        while(route.length){ current = {[route.pop()]: current} }
+    //writeFile(route.at(0))
 
-        //only allow structural changes to storages that don't get written to file
-        configUpdate(store_id, current, (!datastorage[store_id].filepath))
-    } 
+    if(printDebug.includes('set'))console.log(`config.set ${path}: ${current}(${typeof current})`)
+    while(emitroute.length){
+        console.log('EMIT', emitroute.join('/'))
+        config.update.emit(emitroute.join('/'))
+        emitroute.pop()
+    }
+    console.log(JSON.stringify(datastorage['session']))
 }
+//if(route.length === 4)datastorage[route[0]][route[1]][route[2]][route[3]] = value
 
 config.delete = (path) => {
-    const route = path.split('/')
-    const store_id = route[0]
-    // Only allow structural changes to storages that don't get written to file
-    if (!datastorage[store_id].filepath && store_id) {
-        let current = datastorage[store_id]
-        let prop = route.at(-1)
-        // Traverse to the parent of the property to delete
-        //while (path.length > 1){ parent = parent[path.shift()] }
-        route.forEach((ref, i) => { if(i && ref !== prop){ current = current[ref] }})
-        if(current[prop]){
-            if(printDebug.includes('delete'))console.log('config.delete', path)
-            delete current[prop]
-        }
-        else {
-            console.error('config.delete - no entry found')
-        }
-    }
+    console.log('config.delete is deprecated, use .set -> null instead')
 }
 
 newStorage('config', config_path, configTemplate)
+//newStorage('session', null, sessionTemplate)
 newStorage('session', null, {})
