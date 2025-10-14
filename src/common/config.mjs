@@ -7,7 +7,7 @@ import { isDev } from './util.mjs'
 import { console } from './logger.mjs'
 
 //options: get, set, delete, update
-const printDebug = [] //'set', 'get', 'delete'
+const printDebug = ['set', 'get'] //'set', 'get', 'delete'
 
 //TODO: fix non-dev root path
 const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
@@ -97,6 +97,7 @@ function writeFile(store_id){
 }
 
 //updates existing object with partial object that matches to the target structure.
+
 const updateObject = (target, source, allowChanges, path = []) => {
     if(typeof source !== 'undefined'){  //BUG: something about this prevents saving websocket to session storage
         //iterate over all json fields
@@ -129,10 +130,8 @@ const updateObject = (target, source, allowChanges, path = []) => {
         })
     }else{
         console.error(`Unable to update config object '${path.join('/')}' with value '${source}'`)
-    }
-    
+    } 
 }
-
 
 //function to update configuration object with boolean to allow making changes to the structure
 function configUpdate(id, update, bAllowChanges = false){
@@ -145,11 +144,12 @@ function configUpdate(id, update, bAllowChanges = false){
     }
 }
 
-//special function to override safety checks to make sure new devices always have config entry
+//special function that overrides safety checks to make sure new devices always have config entry
 config.devicelist = (list) => {
+    //check for config entries
     for(const label of list){
-        if(!datastorage['config'].Devices[label]){  //no entry for device exists, generate new one
-            //configUpdate('config', { Devices: { [label]: generateDevice(label) } }, true)
+        if(!datastorage['config'].Devices[label]){
+            //no entry for device exists, generate new one
             datastorage['config'].Devices[label] = {
                 label: label,
                 id: crypto.randomUUID().split('-')[0], 
@@ -165,20 +165,28 @@ config.devicelist = (list) => {
             writeFile('config')
         }
     }
+    //update available devices to session storage
+    config.delete('session/Devices/')
+    config.set('session/Devices/', list)
 }
 
 config.get = (path) => {
-    //const route = path.includes('/') ? path.split('/') : [path]
     const route = path.split ? path.split('/') : [path]
     let current = datastorage
-    
-    route.forEach((ref) => { current = current[ref] } )
-    if(printDebug.includes('get'))console.log('config.get', path + ': ' + current + `(${typeof current})`)
+    while(route.length){
+        const ref = route.shift()
+        if(current[ref]){ current = current[ref] }
+        else{
+            current = null
+            break
+        }
+    }
 
-    //const returnvalue = (typeof current === 'undefined') ? {} : current
+    //I don't know why it is returning index:value objects instead of arrays
+    //and this index[0](&&exclude strings) check is far from optimal, but it works for now...
     const returnvalue = current
+    if(printDebug.includes('get'))console.log('config.get', path + ': ' + returnvalue + `(${typeof returnvalue})`)
     return returnvalue
-    
 }
 
 function setCheck(path, value){
@@ -208,7 +216,7 @@ function setCheck(path, value){
 config.set = (path, value) => {
     const route = path.split ? path.split('/') : [path]
     const store_id = route[0]
-    if(printDebug.includes('set'))console.log('config.set', path,' : ' , (typeof value === 'object') ? JSON.stringify(value) : value)
+    if(printDebug.includes('set'))console.log('config.set', path,' : ' , value)
 
     if(setCheck(route, value) && datastorage[store_id]){
         //build update object in reverse, starting from value

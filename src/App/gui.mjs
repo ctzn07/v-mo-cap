@@ -26,6 +26,7 @@ const deviceTemplate = (d) => {
         horizontal: true, 
         children: [
         //cTemplate('toggle', null, ['local', 'Devices', d, 'Active'], ['Off', 'On']), 
+        //cTemplate('toggle', 'Active', `session/Devices/${d}/Active`, ['off', 'on']), 
         cTemplate('text', null, `config/Devices/${d}/label`, null), 
         cTemplate('toggle', 'Face', `config/Devices/${d}/Face`, null), 
         cTemplate('toggle', 'Hand', `config/Devices/${d}/Hand`, null), 
@@ -42,7 +43,7 @@ return [
         horizontal: false, 
         children: [
             cTemplate('text', 'User Settings', null, null), 
-            cTemplate('select', 'Websocket Port', 'config/User/WebsocketPort', [80, 443]), 
+            cTemplate('select', 'Websocket Port', 'config/User/WebsocketPort', [8080]), 
             cTemplate('select', 'Preferred GPU', 'config/User/PreferredGPU', ['dGPU', 'iGPU']), 
         ],
     }, 
@@ -86,15 +87,14 @@ frame.children.forEach(child => {
     return frame
 }
 
-gui.devices = () => {   //Note: list is an array of device labels
-    const localDevices = config.get('session/Devices') || {}
-    const labels = Object.keys(localDevices)
-    const frames = []
-
-    for(const d of labels){
-        if(localDevices[d].Available)frames.push(deviceTemplate(d)) 
-    }
-
+gui.devices = () => {
+    const devices = config.get('session/Devices/')
+    const labels = devices ? Object.values(devices) : []
+    console.log('GUI GOT THESE: ', labels)
+    return []
+    
+    //console.log('GUI: config.get: ', labels)
+    const frames = labels.map(d => deviceTemplate(d))
     return frames.map(f => injectValues(f))
 }
 

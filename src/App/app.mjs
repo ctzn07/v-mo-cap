@@ -19,21 +19,6 @@ function updateUI(channel, data = null){
     else{ console.error(`Cannot call UI update on channel ${channel}`) }
 }
 
-function updateDevices(list){
-    config.devicelist(list)     //special function that makes sure all devices have config entry
-    const devicesObj = config.get('session/Devices') || {}
-    const newList = new Set(list)
-    const oldList = new Set(Object.keys(devicesObj))
-
-    for(const device of newList.union(oldList)){
-        if(devicesObj[device] && devicesObj[device].Available === true){
-            if(!newList.has(device)){ config.set(`session/Devices/${device}/Available`, false) }
-        }else{
-            if(newList.has(device)){ config.set(`session/Devices/${device}/Available`, true) }
-        }
-    }
-}
-
 function createGUI(){
     const win = new BrowserWindow({
         width: 1000,
@@ -47,6 +32,7 @@ function createGUI(){
         },
         autoHideMenuBar: true,
     })
+
     //todo: check is path right for production
     const htmlpath = path.join(app.getAppPath() + '/dist/app.html')
     win.loadFile(htmlpath)
@@ -66,9 +52,15 @@ function createGUI(){
     config.update.on('config/User', () => updateUI('config'))
     
     //Events for receiving data from UI
-    ipcMain.on('devicelist', (e, list) => updateDevices(list))
     ipcMain.on('setconfig', (e, path, value) => config.set(path, value))
     ipcMain.on('update', (e, channel) => updateUI(channel)) //generic UI update request
+    //devicelist triggers multiple times for each connected usb device
+    //adding a small timegate to only trigger on latest update
+    let timer = null
+    ipcMain.on('devicelist', (e, list) => {
+        clearTimeout(timer)
+        timer = setTimeout(() => config.devicelist(list), 500)
+    })
 
     //Data requests events from UI
     //ipcMain.handle('getconfig', (e, path) => { return config.get(path) })

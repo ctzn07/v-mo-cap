@@ -17,14 +17,9 @@ function devicelist(callback){
     .catch(e => console.error(e))
 }
 
-let timegate = null //do not declare inside component
-
 //Device change event
 navigator.mediaDevices.ondevicechange = () => {
-    //ondevicechange() triggers multiple times for some devices
-    //use timeout to only trigger on last event
-    clearTimeout(timegate)
-    timegate = setTimeout(() => devicelist((list) => api.send('devicelist', list.map(d => d.label))), 100)
+    devicelist((list) => api.send('devicelist', list.map(d => d.label)))
 }
 navigator.mediaDevices.ondevicechange() //call initial update
 
