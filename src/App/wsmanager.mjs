@@ -95,24 +95,24 @@ config.update.on('config/User/WebsocketPort', (value) => {
     wsmanager.start()
 })
 
-config.update.on('session/Devices/Available', (list) => {
-    //console.log('WSManager - - - - -')
+config.update.on('session/Devices', (list) => {
+    console.log('WSManager - - - - -')
     const newList = new Set(list || [])
     const oldList = new Set(workers.keys() || [])
 
     for(const device of newList.union(oldList)){
         if(oldList.has(device) && newList.has(device)){
             //device is in old and new list -> do nothing
-            //console.log('worker already exists for ', device)
+            console.log('worker already exists for ', device)
         }
         if(oldList.has(device) && !newList.has(device)){
             //device is in old list, but not in new -> remove worker
-            //console.log('Removing worker for ', device)
+            console.log('Removing worker for ', device)
             workers.delete(device)
         }
         if(!oldList.has(device) && newList.has(device)){
             //device is not in old list, but is in new list -> create worker
-            //console.log('Creating new worker for ', device)
+            console.log('Creating new worker for ', device)
             workers.set(device, {})
         }
     }

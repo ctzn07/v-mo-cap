@@ -96,7 +96,7 @@ function writeFile(store_id){
     }
 }
 
-//special function that overrides safety checks to make sure new devices always have config entry
+//special function that makes sure new devices always have config entry
 config.devicelist = (list) => {
     //check for config entries
     for(const label of list){
@@ -172,9 +172,11 @@ config.set = (path, value) => {
 
     const route = cleanRoute(path)
     writeFile(route.at(0))
+    //Update datastorage with deep copy of itself
+    Object.assign(datastorage, JSON.parse(JSON.stringify(datastorage)))
     while(route.length){
         if(printDebug.includes('emit')){ console.log('config.update.emit', route.join('/')) }
-        config.update.emit(route.join('/'))
+        config.update.emit(route.join('/'), getRef(route.join('/')))
         route.pop()
     }
 }
