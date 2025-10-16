@@ -7,7 +7,7 @@ import { isDev } from './util.mjs'
 import { console } from './logger.mjs'
 
 //options: get, set, delete, update
-const printDebug = ['set', 'delete', 'emit'] //'set', 'get', 'delete', 'emit'
+const printDebug = [] //'set', 'get', 'delete', 'emit'
 
 //TODO: fix non-dev root path
 const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
@@ -53,11 +53,6 @@ const configTemplate = {
         WebsocketPort: 8080, 
         PreferredGPU: 'dGPU',   //options: 'dGPU', 'iGPU'
     }, 
-}
-
-const sessionDeviceTemplate = {
-    Active: false, 
-
 }
 
 const datastorage = {}
@@ -122,25 +117,65 @@ config.devicelist = (list) => {
             writeFile('config')
         }
     }
+    
     //update available devices to session storage
-    //config.set('session/Devices', list)
-    const newList = new Set(list || [])
-    const oldList = new Set(datastorage['session'].Devices ? Object.keys(datastorage['session'].Devices) : [])
+    const newList = new Set(list)
+    const oldList = new Set(Object.keys(config.get('session/Devices') || {}))
 
-    for(const device of newList.union(oldList)){
-        if(oldList.has(device) && newList.has(device)){
-            //device is in old and new list -> do nothing
+    for(const device of oldList){
+        if(!newList.has(device)){
+            //new device list no longer has entry -> set inactive & unavailable
+            config.set(`session/Devices/${device}/Active`, false)
+            config.set(`session/Devices/${device}/Available`, false)
         }
-        if(oldList.has(device) && !newList.has(device)){
-            //device is in old list, but not in new -> remove entry
-            config.delete(`session/Devices/${device}`)
+    }
+
+    for(const device of newList){
+        if(oldList.has(device)){
+            //device has existing session entry
+            if(!datastorage.session.Devices[device].Available){
+                //but it's not marked as available -> update availability
+                config.set(`session/Devices/${device}/Available`, true)
+            }
         }
-        if(!oldList.has(device) && newList.has(device)){
-            //device is not in old list, but is in new list -> create entry
-            config.set(`session/Devices/${device}`, Object.assign({}, sessionDeviceTemplate))
+        else{
+            //old list has no entry for device, create new entry from template
+            const template = {
+                Available: true, 
+                Active: false, 
+            }
+            config.set(`session/Devices/${device}`, Object.assign({}, template))
         }
     }
 }
+
+/*
+const newList = new Set(list)
+const oldList = new Set(Object.keys(config.get('session/Devices') || {}))
+for(const device of newList.union(oldList))
+if(oldList.has(device) && newList.has(device)){
+            //device is in session storage and new list -> do nothing
+        }
+        if(!datastorage['config'].Devices[device].Available && newList.has(device)){
+            //device was already in session storage -> update availability
+            config.set(`session/Devices/${device}/Available`, true)
+        }
+        if(oldList.has(device) && !newList.has(device)){
+            //device is in session storage, but not in new -> change availability to false
+            config.set(`session/Devices/${device}/Active`, false)
+            config.set(`session/Devices/${device}/Available`, false)
+        }
+        if(!oldList.has(device) && newList.has(device)){
+            //device is not in session storage, but is in new list -> create entry
+            const template = {
+                Available: true, 
+                Active: false, 
+            }
+            config.set(`session/Devices/${device}`, Object.assign({}, template))
+        }
+*/
+
+
 
 function cleanRoute(path){
     const route = path.split ? path.split('/') : [path]

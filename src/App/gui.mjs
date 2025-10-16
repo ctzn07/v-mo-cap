@@ -90,7 +90,10 @@ frame.children.forEach(child => {
 gui.devices = () => {
     const devices = config.get('session/Devices') || {}
     //console.log('GUI GOT THESE: ', devices)
-    const frames = Object.keys(devices).map(d => deviceTemplate(d))
+    const frames = []
+    for(const d of Object.keys(devices)){
+        if(devices[d].Available)frames.push(deviceTemplate(d))
+    }
     return frames.map(f => injectValues(f))
 }
 
