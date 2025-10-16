@@ -96,7 +96,8 @@ config.update.on('config/User/WebsocketPort', (value) => {
 })
 
 config.update.on('session/Devices', (list) => {
-    console.log('WSManager - - - - -')
+    //console.log('WSManager - - - - -', list)
+    /*
     const newList = new Set(list || [])
     const oldList = new Set(workers.keys() || [])
 
@@ -115,7 +116,7 @@ config.update.on('session/Devices', (list) => {
             console.log('Creating new worker for ', device)
             workers.set(device, {})
         }
-    }
+    }*/
 })
 
 //1001	Going Away

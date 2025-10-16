@@ -7,7 +7,7 @@ import { isDev } from './util.mjs'
 import { console } from './logger.mjs'
 
 //options: get, set, delete, update
-const printDebug = [] //'set', 'get', 'emit'
+const printDebug = ['set', 'delete', 'emit'] //'set', 'get', 'delete', 'emit'
 
 //TODO: fix non-dev root path
 const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
@@ -53,6 +53,11 @@ const configTemplate = {
         WebsocketPort: 8080, 
         PreferredGPU: 'dGPU',   //options: 'dGPU', 'iGPU'
     }, 
+}
+
+const sessionDeviceTemplate = {
+    Active: false, 
+
 }
 
 const datastorage = {}
@@ -118,7 +123,23 @@ config.devicelist = (list) => {
         }
     }
     //update available devices to session storage
-    config.set('session/Devices', list)
+    //config.set('session/Devices', list)
+    const newList = new Set(list || [])
+    const oldList = new Set(datastorage['session'].Devices ? Object.keys(datastorage['session'].Devices) : [])
+
+    for(const device of newList.union(oldList)){
+        if(oldList.has(device) && newList.has(device)){
+            //device is in old and new list -> do nothing
+        }
+        if(oldList.has(device) && !newList.has(device)){
+            //device is in old list, but not in new -> remove entry
+            config.delete(`session/Devices/${device}`)
+        }
+        if(!oldList.has(device) && newList.has(device)){
+            //device is not in old list, but is in new list -> create entry
+            config.set(`session/Devices/${device}`, Object.assign({}, sessionDeviceTemplate))
+        }
+    }
 }
 
 function cleanRoute(path){
@@ -141,6 +162,28 @@ const setRef = (path, value) => {
     ref[target] = value
 }
 
+const delRef = (path) => {
+    const route = cleanRoute(path)
+    const target = route.pop()
+    const ref = route.reduce((r, c) => r[c] ? r[c] : r[c] = {}, datastorage)
+    //(Boolean(ref[target])) ? delete ref[target] : console.error(`config.delete (${route.join('/')}) failed`)
+    //^this gives an error about accessing ref before intialization, interesting...(not even toasters can explain why)
+    if(ref[target]){ delete ref[target] }
+    else{ console.error(`config.delete (${route.join('/')}) failed`) }
+}
+
+const emitPath = (path) => {
+    const route = cleanRoute(path)
+    //console.log(route)
+    while(route.length){
+        if(printDebug.includes('emit')){
+            console.log('config.update.emit', route.join('/'))
+        }
+        config.update.emit(route.join('/'), getRef(route.join('/')))
+        route.pop()
+    }
+}
+
 config.get = (path) => {
     const current = getRef(path)
 
@@ -154,6 +197,29 @@ config.get = (path) => {
     }
 }
 
+config.set = (path, value) => {
+    setRef(path, value)
+
+    const current = getRef(path)
+    if(printDebug.includes('set'))console.log(`config.set ${path}: ${current}(${typeof current})`)
+
+    
+    writeFile(path.split('/').at(0))
+    //Update datastorage with deep copy of itself
+    Object.assign(datastorage, JSON.parse(JSON.stringify(datastorage)))
+    emitPath(path)
+}
+//if(route.length === 4)datastorage[route[0]][route[1]][route[2]][route[3]] = value
+
+config.delete = (path) => {
+    if(printDebug.includes('delete'))console.log(`config.delete ${path}`)
+    delRef(path)
+    emitPath(path)
+}
+
+newStorage('config', config_path, configTemplate)
+newStorage('session', null, {})
+
 /*
     let current = datastorage
     for (let i = 0; i < route.length - 1; i++) {
@@ -163,28 +229,3 @@ config.get = (path) => {
     }
     current[route.at(-1)] = value
 */
-
-config.set = (path, value) => {
-    setRef(path, value)
-
-    const current = getRef(path)
-    if(printDebug.includes('set'))console.log(`config.set ${path}: ${current}(${typeof current})`)
-
-    const route = cleanRoute(path)
-    writeFile(route.at(0))
-    //Update datastorage with deep copy of itself
-    Object.assign(datastorage, JSON.parse(JSON.stringify(datastorage)))
-    while(route.length){
-        if(printDebug.includes('emit')){ console.log('config.update.emit', route.join('/')) }
-        config.update.emit(route.join('/'), getRef(route.join('/')))
-        route.pop()
-    }
-}
-//if(route.length === 4)datastorage[route[0]][route[1]][route[2]][route[3]] = value
-
-config.delete = (path) => {
-    console.log('config.delete is deprecated, use .set -> null instead')
-}
-
-newStorage('config', config_path, configTemplate)
-newStorage('session', null, {})
