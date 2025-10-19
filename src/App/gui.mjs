@@ -26,7 +26,7 @@ const deviceTemplate = (d) => {
         horizontal: true, 
         children: [
         //cTemplate('toggle', null, ['local', 'Devices', d, 'Active'], ['Off', 'On']), 
-        cTemplate('toggle', null, `session/Devices/${d}/Active`, ['Off', 'On']), 
+        //cTemplate('toggle', null, `config/Devices/${d}/Active`, ['Off', 'On']), 
         cTemplate('text', null, `config/Devices/${d}/label`, null), 
         cTemplate('toggle', 'Face', `config/Devices/${d}/Face`, null), 
         cTemplate('toggle', 'Hand', `config/Devices/${d}/Hand`, null), 
@@ -88,12 +88,10 @@ frame.children.forEach(child => {
 }
 
 gui.devices = () => {
-    const devices = config.get('session/Devices') || {}
-    //console.log('GUI GOT THESE: ', devices)
+    const devices = config.get('session/Devices/Connected') || []
+    
     const frames = []
-    for(const d of Object.keys(devices)){
-        if(devices[d].Available)frames.push(deviceTemplate(d))
-    }
+    for(const d of devices){ frames.push(deviceTemplate(d)) }
     return frames.map(f => injectValues(f))
 }
 

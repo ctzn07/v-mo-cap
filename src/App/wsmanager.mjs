@@ -6,13 +6,12 @@ import { config } from '../common/config.mjs'
 import { console } from '../common/logger.mjs'
 
 import { isDev, platform } from '../common/util.mjs'
+import { js } from 'three/tsl'
 
 export const wsmanager = {}
 
 var wss = null
 
-const tokenMap = new Map()
-const wsMap = new Map()
 const workers = new Map()
 
 //wsmanager.update.eventNames()
@@ -27,58 +26,100 @@ const io_logger = (error, stdout, stderr) => {
     //if(stderr){console.error('WORKER:', stderr)}
 }
 
-const newConnection = (ws, token) => {
-    const device = tokenMap.get(token)
-    if(tokenMap.has(token) && wsMap.has(device)){ 
-        //incoming events
-        ws.on('message', (data, isBinary) => wsMap.get(device).emit('message', data, isBinary))
-        ws.on('error', (e) => console.error(device, ': ', e))
-        ws.on('close', (code, reason) => {
-            console.log(`${device} disconnected: ${code} - ${reason}`)
-            //clean up eventlisteners for the connection
-            wsMap.get(device).removeAllListeners()
-            wsMap.delete(device)
-            //if device is still active, reconnect
-            if(config.get(`session/Devices/${device}/Active`)){
-                console.log(`Reconnecting ${device}...`)
-                createWorker(device)
-            }
-        })
-
-        //outgoing events
-        wsMap.get(device).on('send', (data) => ws.send(data))
-        wsMap.get(device).on('disconnect', (code, reason) => ws.close(code, reason))
+class Worker {
+    #websocket  
+    constructor(device) {
+        this.device = device
     }
-    else{ ws.close(3000, '401 - Unauthorized') }
+
+    start(token, port){
+        wsmanager.update.once(token, (ws) => this.connect(ws))
+        if(isDev()){ exec(`npm run worker worker="true" port="${port}" token="${token}"`, (...args) => io_logger(...args)) }
+        else{ this.error('Worker spawning not set up for production') }
+    }
+
+    connect(ws){
+        this.#websocket = ws
+        this.#websocket.on('message', (...args) => this.message(...args))
+        this.#websocket.on('error', (...args) => this.error(...args))
+        this.#websocket.on('close', (...args) => this.close(...args))
+    }
+
+    message(data, isBinary){
+        const packet = JSON.parse(data)
+        console.log('received:', JSON.stringify(packet))
+    }
+
+    detect(){
+
+    }
+
+    error(e){
+
+    }
+
+    close(code, reason){
+
+    }
+
+    stop(reason){
+        console.log(`${this.device} stopped: ${reason}`)
+        this.#websocket.close(1000, 'Worker stopped')
+        workers.delete(this.device)
+    }
+}
+
+
+
+const newToken = () => {
+    const token = crypto.randomUUID()
+    setTimeout(() => wsmanager.update.removeAllListeners(token), 3000)
+    return token
 }
 
 function createWorker(device){
-    console.log('creating worker ', device)
-    wsMap.set(device, {})
-    if(false){
-        wsMap.set(device, new WSEmitter())
-        console.log(`no previous connection found for ${device}, creating new...`)
-
-        const token = crypto.randomUUID()
-        tokenMap.set(token, device)
-        setTimeout(() => tokenMap.delete(token), 3000)
-
-        if(isDev()){ exec(`npm run worker worker="true" port="${wss.address().port}" token="${token}"`, (...args) => io_logger(...args)) }
-        else{ console.error('wsmanager.mjs - Worker spawning not set up for production') }
+    if(!workers.has(device)){
+        console.log(`creating worker for device ${device}`)
+        workers.set(device, new Worker(device))
+        workers.get(device).start(newToken(), wss.address().port)
     }
-    //else{ console.log(`${device} already has an active connection, aborting`) }
+    else {
+        console.error(`createWorker: ${device} already has a worker`)
+    }
 }
 
-function removeWorker(device){
-    wsMap.delete(device)
-    console.log('removing worker ', device)
+function removeWorker(device){ 
+    if(workers.has(device)){
+        console.log(`removing worker for device ${device}`)
+        workers.get(device).stop('Device disconnected')
+    }
+    else{
+        console.error(`removeWorker: no worker for ${device} found`)
+    }
+}
+
+function updateWorkers(list){
+    const oldList = new Set(workers.keys() || [])
+    const newList = new Set(list || [])
+
+    for(const d of newList){
+        //old list does not have this device -> create new worker
+        if(!oldList.has(d)){ createWorker(d) }
+    }
+
+    for(const d of oldList){
+        //new list of connected devices does not have this device -> remove worker
+        if(!newList.has(d)){ removeWorker(d) }
+    }
 }
 
 wsmanager.start = () => {
     const wsport = config.get('config/User/WebsocketPort')
+
     try{
         wss = new WebSocketServer({ port: wsport, perMessageDeflate: false })
-        wss.on('connection', (ws, req) => { newConnection(ws, req.url.split('/').at(-1)) })
+        wss.on('connection', (ws, req) => { wsmanager.update.emit(req.url.split('/').at(-1), ws) })
+        //newConnection(ws, req.url.split('/').at(-1))
         wss.on('close', (ws) => console.log('WSS server connection closed'))
         wss.on('listening', () => console.log(`WSS listening at port ${wsport}`))
         wss.on('error', (err) => console.error('WSS error: ', err))
@@ -95,12 +136,7 @@ config.update.on('config/User/WebsocketPort', (value) => {
     wsmanager.start()
 })
 
-config.update.on('session/Devices', (list) => {
-    //list is object containing entry for each device
-    const available = Object.keys(list).filter(d => { if(list[d].Available)return d })
-    //console.log('Available devices: ', available)
-    console.log('Session devices: ', JSON.stringify(list))
-})
+config.update.on('session/Devices/Connected', (list) => updateWorkers(list))
 
 //1001	Going Away
 //1006	Abnormal Closure

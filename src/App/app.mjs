@@ -80,5 +80,5 @@ export default function initApp(args){
 app.on('window-all-closed', () => {
     wsmanager.stop('application closing')
     if (platform() !== 'darwin') app.quit()
-    app.exit(1)
+    app.exit(0)
 })

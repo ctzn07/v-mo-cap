@@ -7,7 +7,7 @@ import { isDev } from './util.mjs'
 import { console } from './logger.mjs'
 
 //options: get, set, delete, update
-const printDebug = [] //'set', 'get', 'delete', 'emit'
+const printDebug = ['set'] //'set', 'get', 'delete', 'emit'
 
 //TODO: fix non-dev root path
 const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
@@ -102,8 +102,9 @@ config.devicelist = (list) => {
     for(const label of list){
         if(!datastorage['config'].Devices[label]){
             //no entry for device exists, generate new one
-            datastorage['config'].Devices[label] = {
-                label: label,
+            const template = {
+                label: label, 
+                Active: false, 
                 id: crypto.randomUUID().split('-')[0], 
                 Face: false, 
                 Body: false, 
@@ -114,19 +115,32 @@ config.devicelist = (list) => {
                     Lens: {k1: 0, k2: 0, k3: 0, centerX: 0.5, centerY: 0.5}
                 } 
             }
-            writeFile('config')
+            config.set(`config/Devices/${label}`, template)
         }
     }
-    
-    //update available devices to session storage
+    //!!! this code should not be here, as it is an exception to design rules
+    //TODO: find a workaround that doesn't require specifically setting device to inactive on disconnect
+    /*
+    for(const d of Object.keys(datastorage.config.Devices)){
+        if(!list.includes(d) && datastorage.config.Devices[d].Active){      
+            config.set(`config/Devices/${d}/Active`, false)
+        }
+    }
+    */
+    config.set(`session/Devices/Connected`, list)
+}
+
+/*
+//update available devices to session storage
     const newList = new Set(list)
     const oldList = new Set(Object.keys(config.get('session/Devices') || {}))
 
     for(const device of oldList){
         if(!newList.has(device)){
             //new device list no longer has entry -> set inactive & unavailable
-            config.set(`session/Devices/${device}/Active`, false)
-            config.set(`session/Devices/${device}/Available`, false)
+            //config.set(`session/Devices/${device}/Active`, false)
+            //config.set(`session/Devices/${device}/Available`, false)
+            config.delete(`session/Devices/${device}`)
         }
     }
 
@@ -135,47 +149,19 @@ config.devicelist = (list) => {
             //device has existing session entry
             if(!datastorage.session.Devices[device].Available){
                 //but it's not marked as available -> update availability
-                config.set(`session/Devices/${device}/Available`, true)
+                //config.set(`session/Devices/${device}/Available`, true)
             }
         }
         else{
-            //old list has no entry for device, create new entry from template
-            const template = {
-                Available: true, 
+            //device has existing session entry, create new entry from template
+            const template = { 
                 Active: false, 
             }
-            config.set(`session/Devices/${device}`, Object.assign({}, template))
+            //config.set(`session/Devices/${device}`, Object.assign({}, template))
+            
         }
     }
-}
-
-/*
-const newList = new Set(list)
-const oldList = new Set(Object.keys(config.get('session/Devices') || {}))
-for(const device of newList.union(oldList))
-if(oldList.has(device) && newList.has(device)){
-            //device is in session storage and new list -> do nothing
-        }
-        if(!datastorage['config'].Devices[device].Available && newList.has(device)){
-            //device was already in session storage -> update availability
-            config.set(`session/Devices/${device}/Available`, true)
-        }
-        if(oldList.has(device) && !newList.has(device)){
-            //device is in session storage, but not in new -> change availability to false
-            config.set(`session/Devices/${device}/Active`, false)
-            config.set(`session/Devices/${device}/Available`, false)
-        }
-        if(!oldList.has(device) && newList.has(device)){
-            //device is not in session storage, but is in new list -> create entry
-            const template = {
-                Available: true, 
-                Active: false, 
-            }
-            config.set(`session/Devices/${device}`, Object.assign({}, template))
-        }
 */
-
-
 
 function cleanRoute(path){
     const route = path.split ? path.split('/') : [path]
@@ -186,8 +172,14 @@ function cleanRoute(path){
 const getRef = (path) => {
     const route = cleanRoute(path)
     const target = route.pop()
-    const ref = route.reduce((r, c) => r[c], datastorage)
-    return ref[target]
+    try {
+        const ref = route.reduce((r, c) => r[c], datastorage)
+        return ref[target]
+    }
+    catch(e){
+        console.error(`config.get failed (${route.join('/')})`)
+        return null
+    }
 }
 
 const setRef = (path, value) => {
@@ -200,20 +192,19 @@ const setRef = (path, value) => {
 const delRef = (path) => {
     const route = cleanRoute(path)
     const target = route.pop()
-    const ref = route.reduce((r, c) => r[c] ? r[c] : r[c] = {}, datastorage)
-    //(Boolean(ref[target])) ? delete ref[target] : console.error(`config.delete (${route.join('/')}) failed`)
-    //^this gives an error about accessing ref before intialization, interesting...(not even toasters can explain why)
-    if(ref[target]){ delete ref[target] }
-    else{ console.error(`config.delete (${route.join('/')}) failed`) }
+    
+    try {
+        const ref = route.reduce((r, c) => r[c] ? r[c] : r[c] = {}, datastorage)
+        delete ref[target]
+    } catch (e) {
+        console.error(`config.delete (${route.join('/')}) failed`)
+    }
 }
 
 const emitPath = (path) => {
     const route = cleanRoute(path)
-    //console.log(route)
     while(route.length){
-        if(printDebug.includes('emit')){
-            console.log('config.update.emit', route.join('/'))
-        }
+        if(printDebug.includes('emit')){ console.log('config.update.emit', route.join('/')) }
         config.update.emit(route.join('/'), getRef(route.join('/')))
         route.pop()
     }
@@ -236,9 +227,8 @@ config.set = (path, value) => {
     setRef(path, value)
 
     const current = getRef(path)
-    if(printDebug.includes('set'))console.log(`config.set ${path}: ${current}(${typeof current})`)
+    if(printDebug.includes('set')){ console.log(`config.set ${path}: ${current}(${typeof current})`) }
 
-    
     writeFile(path.split('/').at(0))
     //Update datastorage with deep copy of itself
     Object.assign(datastorage, JSON.parse(JSON.stringify(datastorage)))
@@ -248,8 +238,11 @@ config.set = (path, value) => {
 
 config.delete = (path) => {
     if(printDebug.includes('delete'))console.log(`config.delete ${path}`)
-    delRef(path)
+    setRef(path, null)
     emitPath(path)
+    setTimeout(() => {
+        delRef(path)
+    }, 1000);
 }
 
 newStorage('config', config_path, configTemplate)
