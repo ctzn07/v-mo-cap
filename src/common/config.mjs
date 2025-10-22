@@ -7,7 +7,7 @@ import { isDev } from './util.mjs'
 import { console } from './logger.mjs'
 
 //options: get, set, delete, update
-const printDebug = ['set'] //'set', 'get', 'delete', 'emit'
+const printDebug = [] //'set', 'get', 'delete', 'emit'
 
 //TODO: fix non-dev root path
 const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))

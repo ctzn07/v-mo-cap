@@ -59,22 +59,22 @@ function createGUI(params){
     if(isDev()){ win.webContents.openDevTools() }
 
     //page has finished loading
-    win.webContents.on('did-finish-load', () => {})
+    win.webContents.on('did-finish-load', () => {
+        //connect to main process using websocket
+        worker.ws = new WebSocket(`ws://localhost:${params.port}/${params.token}`, {perMessageDeflate: false})
+        worker.ws.on('open', () => { /* do websocket event binds here */})
+        worker.ws.on('message', (data, isBinary) => { wsReceive(data, isBinary) })
+
+        //on error/connection loss -> app quit
+        worker.ws.on('error', (e) => { console.log(e); quit() })
+        worker.ws.on('close', () => { quit() })
+    })
 }
 
 //const send = (channel, packet) => worker.ws.send(JSON.stringify({api: channel, data: packet}))
 //const request = (path) => worker.ws.send(JSON.stringify({api: 'request', data: path}))
 
 export default function initWorker(args){
-    //connect to main process using websocket
-    worker.ws = new WebSocket(`ws://localhost:${params.port}/${params.token}`, {perMessageDeflate: false})
-    worker.ws.on('open', () => { /* do websocket event binds here */})
-    worker.ws.on('message', (data, isBinary) => { wsReceive(data, isBinary) })
-
-    //on error/connection loss -> app quit
-    worker.ws.on('error', (e) => { console.log(e); quit() })
-    worker.ws.on('close', () => { quit() })
-
     app.on('ready', () => { createGUI(args) })
     app.on('window-all-closed', () => { quit() })
 }
