@@ -104,7 +104,6 @@ config.devicelist = (list) => {
             //no entry for device exists, generate new one
             const template = {
                 label: label, 
-                Active: false, 
                 id: crypto.randomUUID().split('-')[0], 
                 Face: false, 
                 Body: false, 
