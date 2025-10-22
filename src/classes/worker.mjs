@@ -5,33 +5,17 @@ import { isDev, platform } from '../common/util.mjs'
 export class Worker {
     #websocket
     #token = crypto.randomUUID().split('-').at(-1)
+
     constructor(device, emitter) {
         this.device = device
         this.emitter = emitter
-        //new websocket connection events listener for this device token
-        this.emitter.on(this.#token, (ws) => {
-            this.#websocket = ws
-            this.#websocket.on('message', (...args) => this.receive(...args))
-            this.#websocket.on('error', (...args) => this.error(...args))
-            this.#websocket.on('close', (...args) => this.close(...args))
-        })
-        //create event listener for each method
-        /*
-        for(const m of Object.getOwnPropertyNames(Worker.prototype)){
-            this.emitter.on(`worker/${this.device}/${m}`, (...args) => this[m](...args))  
-        }*/
-    
+        //capture new websocket connection from token event channel
+        this.emitter.on(this.#token, (ws) => { this.connect(ws) })
     }
 
     terminate(reason = 'Worker terminated'){
         //worker is permanently closed
         console.log(`Worker.terminate: ${reason} - ${this.device}`)
-        
-        //remove event listener for each method
-        /*
-        for(const m of Object.getOwnPropertyNames(Worker.prototype)){
-            this.emitter.removeAllListeners(`worker/${this.device}/${m}`)  
-        }*/
 
         //close websocket
         this.disconnect(reason)
@@ -51,7 +35,9 @@ export class Worker {
         console.log(`Worker.connect() - ${this.device}`)
         //TODO: check if ws is already connected
         this.#websocket = ws
-        
+        this.#websocket.on('message', (...args) => this.receive(...args))
+        this.#websocket.on('error', (...args) => this.error(...args))
+        this.#websocket.on('close', (...args) => this.close(...args))
     }
 
     disconnect(reason){
@@ -84,7 +70,7 @@ export class Worker {
     receive(data, isBinary){
         console.log(`Worker.receive() - ${this.device}`)
         if(!isBinary){
-            console.log(JSON.parse(data))
+            console.log(data)
         }
         else this.error(`${this.device} received binary data`)
     }
@@ -92,4 +78,18 @@ export class Worker {
     error(e){
         console.error(`Worker.error: ${e || '-'} - ${this.device}`)
     }
+    close(){
+        //???
+    }
 }
+//create event listener for each method
+/*
+for(const m of Object.getOwnPropertyNames(Worker.prototype)){
+    this.emitter.on(`worker/${this.device}/${m}`, (...args) => this[m](...args))  
+}*/
+
+//remove event listener for each method
+/*
+for(const m of Object.getOwnPropertyNames(Worker.prototype)){
+    this.emitter.removeAllListeners(`worker/${this.device}/${m}`)  
+}*/

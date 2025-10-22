@@ -62,7 +62,9 @@ function createGUI(params){
     win.webContents.on('did-finish-load', () => {
         //connect to main process using websocket
         worker.ws = new WebSocket(`ws://localhost:${params.port}/${params.token}`, {perMessageDeflate: false})
-        worker.ws.on('open', () => { /* do websocket event binds here */})
+        worker.ws.on('open', () => {
+            worker.ws.send('this is a test package')
+        })
         worker.ws.on('message', (data, isBinary) => { wsReceive(data, isBinary) })
 
         //on error/connection loss -> app quit
