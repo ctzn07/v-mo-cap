@@ -6,7 +6,12 @@ import { WebSocket } from 'ws'
 import { isDev, platform } from '../common/util.mjs'
 import path from 'path'
 
+
+app.commandLine.appendSwitch('log-level', 3)
+
 const worker = {}
+const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
+const config_path = path.join(root_path, './config.json')
 
 //websocket module event emitter
 class Wmitter extends EventEmitter {}
@@ -33,11 +38,27 @@ function quit(){
     app.exit(0)
 }
 
-function wsReceive(data, isBinary){
-    if(!isBinary){
-        console.log('worker received ', data)
-    }
+function receiveData(data, isBinary){
+    if(!isBinary){ console.log('worker received ', data) }
     else console.error('Worker received binary data, discarding...')
+}
+
+function connectWebsocket(port, token){
+    //connect to main process using websocket
+    //const ws = new WebSocket(`ws://localhost:${port}/${token}`, {perMessageDeflate: false})
+    //ws.on('open', () => { ws.send(`${token} connected`) })
+    if(fs.existsSync(config_path)){
+        const data = JSON.parse(fs.readFileSync(config_path, { encoding: 'utf-8', JSON: true }))
+        
+        const ws = new WebSocket(`ws://localhost:${port}/${token}`, {perMessageDeflate: false})
+
+        ws.on('message', (data, isBinary) => { receiveData(data, isBinary) })
+
+        //on error/connection loss -> app quit
+        ws.on('error', (e) => { ws.close(1011, e) })
+        ws.on('close', () => { quit() })
+    }
+    
 }
 
 function createGUI(params){
@@ -50,7 +71,8 @@ function createGUI(params){
         sandbox: false,   //preloading .mjs is not compatible with sandboxing
         }, 
         autoHideMenuBar: true, 
-        show: isDev(), 
+        //show: isDev(), 
+        show: true, 
         title: `VMC Worker(${params.token})`, 
     })
     //todo: check is path right for production
@@ -59,22 +81,8 @@ function createGUI(params){
     if(isDev()){ win.webContents.openDevTools() }
 
     //page has finished loading
-    win.webContents.on('did-finish-load', () => {
-        //connect to main process using websocket
-        worker.ws = new WebSocket(`ws://localhost:${params.port}/${params.token}`, {perMessageDeflate: false})
-        worker.ws.on('open', () => {
-            worker.ws.send('this is a test package')
-        })
-        worker.ws.on('message', (data, isBinary) => { wsReceive(data, isBinary) })
-
-        //on error/connection loss -> app quit
-        worker.ws.on('error', (e) => { console.log(e); quit() })
-        worker.ws.on('close', () => { quit() })
-    })
+    win.webContents.on('did-finish-load', () => { connectWebsocket(params.port, params.token) })
 }
-
-//const send = (channel, packet) => worker.ws.send(JSON.stringify({api: channel, data: packet}))
-//const request = (path) => worker.ws.send(JSON.stringify({api: 'request', data: path}))
 
 export default function initWorker(args){
     app.on('ready', () => { createGUI(args) })

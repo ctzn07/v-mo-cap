@@ -18,20 +18,22 @@ const workers = new Map()
 class WSEmitter extends EventEmitter {}
 wsmanager.update = new WSEmitter()
 
-
 function createWorker(device){
     if(workers.has(device)){
         console.error(`createWorker: ${device} already has a worker`)
     }
     else {
-        workers.set(device, new Worker(device, wsmanager.update))
-        workers.get(device).start(wss.address().port)
+        workers.set(device, new Worker(device))
+        //add token listener
+        wsmanager.update.on(workers.get(device).token, (ws) => { workers.get(device).newConnection(ws) })
     }  
 }
 
 function removeWorker(device){ 
     if(workers.has(device)){
-        workers.get(device).terminate('Device disconnected')
+        //remove token listener
+        wsmanager.update.removeAllListeners(workers.get(device).token)
+        workers.get(device).terminate(1000, 'Device disconnected')
         workers.delete(device)
     }
     else{
@@ -55,22 +57,26 @@ wsmanager.start = () => {
     const wsport = config.get('config/User/WebsocketPort')
 
     try{
-        wss = new WebSocketServer({ port: wsport, perMessageDeflate: false })
-        wss.on('connection', (ws, req) => { wsmanager.update.emit(req.url.split('/').at(-1), ws) })
-        wss.on('close', (ws) => console.log('WSS server connection closed'))
-        wss.on('listening', () => console.log(`WSS listening at port ${wsport}`))
-        wss.on('error', (err) => console.error('WSS error: ', err))
+        wss = new WebSocketServer({ port: wsport, perMessageDeflate: false, clientTracking: true })
+        wss.on('connection', (ws, req) => {
+            const token = req.url.split('/').at(-1)
+            wsmanager.update.emit(token, ws)
+        })
+        wss.on('close', (ws) => console.log('Websocket server connection closed'))
+        wss.on('listening', () => console.log(`Websocket listening port ${wsport}`))
+        wss.on('error', (err) => console.error('Websocket error: ', err))
     }
     catch (e) { console.error('Error starting WSS - ', e) }
 }
 
-wsmanager.stop = (msg = '') => { wss.close(() => console.log('WSS closed:', msg)) }
+wsmanager.stop = (msg = '') => { wss.close(() => console.log(msg)) }
 
 //if websocket port changes, restart server
 config.update.on('config/User/WebsocketPort', (value) => {
-    //TODO: reconnect all devices
-    wsmanager.stop(`config changed, restarting`)
+    wsmanager.stop(`Websocket port changed, restarting server...`)
     wsmanager.start()
+    //Note: Workers will automatically reconnect
+    //as long as their designated device is set to active
 })
 
 config.update.on('session/Devices/Connected', (list) => updateWorkers(list))
