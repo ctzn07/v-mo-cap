@@ -1,6 +1,7 @@
 //Module that manages tracker connections
 import { WebSocketServer } from 'ws'
 import EventEmitter from 'node:events'
+import { exec, spawn } from 'child_process'
 
 import { config } from '../common/config.mjs'
 import { console } from '../common/logger.mjs'
@@ -11,6 +12,7 @@ export const wsmanager = {}
 var wss = null
 
 const workers = new Map()
+const reservations = []
 
 //wsmanager.update.eventNames()
 
@@ -18,27 +20,31 @@ const workers = new Map()
 class WSEmitter extends EventEmitter {}
 wsmanager.update = new WSEmitter()
 
+//TODO: create a class that manages communication over websocket
+//API request->[class <-> promise]<--communication-->[class] <-> data
+
 function createWorker(device){
-    if(workers.has(device)){
-        console.error(`createWorker: ${device} already has a worker`)
-    }
-    else {
-        workers.set(device, new Worker(device))
-        //add token listener
-        wsmanager.update.on(workers.get(device).token, (ws) => { workers.get(device).newConnection(ws) })
-    }  
+    exec(`npm run worker worker="true"`)
+    console.log(`New Worker(${device})`)
+    reservations.push(device)
 }
 
-function removeWorker(device){ 
-    if(workers.has(device)){
-        //remove token listener
-        wsmanager.update.removeAllListeners(workers.get(device).token)
-        workers.get(device).terminate(1000, 'Device disconnected')
-        workers.delete(device)
+function assignWorker(ws){
+    const device = reservations.shift()
+    if(!device){
+        console.error(`Unexpected websocket connection rejected`)
+        ws.close(3000, '401 - Unauthorized')
     }
     else{
-        console.error(`removeWorker: No worker found for device ${device}`)
+        workers.set(device, ws)
     }
+}
+
+function removeWorker(device){
+    console.log(`Worker removed(${device})`)
+    //TODO: send disconnect to process assigned for this device
+    workers.get(device).send(JSON.stringify({disconnect:true}))
+    workers.delete(device)
 }
 
 function updateWorkers(list){
@@ -59,8 +65,18 @@ wsmanager.start = () => {
     try{
         wss = new WebSocketServer({ port: wsport, perMessageDeflate: false, clientTracking: true })
         wss.on('connection', (ws, req) => {
-            const token = req.url.split('/').at(-1)
-            wsmanager.update.emit(token, ws)
+            const route = req.url.split('/').at(-1)
+            switch (route) {
+                //suppose there will be more routes to handle later on
+                case 'worker':
+                    assignWorker(ws)
+                    break 
+                default:
+                    console.error(`Websocket server rejected connection to ${req.url}`)
+                    ws.close(3000, '401 - Unauthorized')
+                    break
+            }
+            
         })
         wss.on('close', (ws) => console.log('Websocket server connection closed'))
         wss.on('listening', () => console.log(`Websocket listening port ${wsport}`))
@@ -72,7 +88,7 @@ wsmanager.start = () => {
 wsmanager.stop = (msg = '') => { wss.close(() => console.log(msg)) }
 
 //if websocket port changes, restart server
-config.update.on('config/User/WebsocketPort', (value) => {
+config.update.on('config/User/WebsocketPort', () => {
     wsmanager.stop(`Websocket port changed, restarting server...`)
     wsmanager.start()
     //Note: Workers will automatically reconnect

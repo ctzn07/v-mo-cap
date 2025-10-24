@@ -17,7 +17,7 @@ export class Worker {
         const port = config.get('config/User/WebsocketPort')
         if(isDev()){
             //exec(`npm run worker worker="true" port="${port}" token="${this.token}"`)//, (error, stdout, stderr) => {}
-            exec(`npm run worker worker="true" port="${port}" token="${this.token}"`, (error, stdout, stderr) => {if(stdout)console.log('STDOUT: ', stdout)})
+            exec(`npm run worker worker="true"`)
         }
         else{ console.error('Worker process spawning not set up for production') }
     }

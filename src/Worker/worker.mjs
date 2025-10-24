@@ -6,17 +6,63 @@ import { WebSocket } from 'ws'
 import { isDev, platform } from '../common/util.mjs'
 import path from 'path'
 
-
-app.commandLine.appendSwitch('log-level', 3)
-
-const worker = {}
 const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
 const config_path = path.join(root_path, './config.json')
 
-//websocket module event emitter
-class Wmitter extends EventEmitter {}
-worker.update = new Wmitter()
+function quit(code){
+    if(platform() !== 'darwin')app.quit(code)
+    app.exit(code)
+}
 
+function createGUI(){
+    const win = new BrowserWindow({
+        width: 800, 
+        height: 800, 
+        webPreferences: {
+        //todo: check is path right for production
+        preload: path.join(app.getAppPath() + '/src/common/api.mjs'),
+        sandbox: false,   //preloading .mjs is not compatible with sandboxing
+        }, 
+        autoHideMenuBar: true, 
+        //show: isDev(), 
+        show: true, 
+        title: `VMC Worker()`, 
+    })
+    //todo: check is path right for production
+    const htmlpath = path.join(app.getAppPath() + '/dist/worker.html')
+    win.loadFile(htmlpath)
+    if(isDev()){ win.webContents.openDevTools() }
+
+    //page has finished loading
+    win.webContents.on('did-finish-load', () => {
+        //connect to main process using websocket
+        if(fs.existsSync(config_path)){
+            const config = JSON.parse(fs.readFileSync(config_path, { encoding: 'utf-8', JSON: true }))
+
+            const ws = new WebSocket(`ws://localhost:${config.User.WebsocketPort}/worker`, {perMessageDeflate: false})
+
+            ws.on('message', (data, isBinary) => {
+                const packet = JSON.parse(data)
+                if(packet.disconnect)app.quit()
+            })
+
+            //on error/connection loss -> app quit
+            ws.on('error', (e) => ws.close(1011, e))
+            ws.on('close', () => quit(0))
+        }
+        else{
+            console.log('Worker cant read config file')
+            quit(1)
+        }
+    })
+}
+
+export default function initWorker(args){
+    app.on('ready', () => createGUI(args))
+    app.on('window-all-closed', () => quit())
+}
+
+/*
 const wsPromise = (api, data) => {
     let timeout
     //unique identifier for this promise
@@ -32,59 +78,4 @@ const wsPromise = (api, data) => {
         }, 1000)
     })
 }
-
-function quit(){
-    if(platform() !== 'darwin')app.quit()
-    app.exit(0)
-}
-
-function receiveData(data, isBinary){
-    if(!isBinary){ console.log('worker received ', data) }
-    else console.error('Worker received binary data, discarding...')
-}
-
-function connectWebsocket(port, token){
-    //connect to main process using websocket
-    //const ws = new WebSocket(`ws://localhost:${port}/${token}`, {perMessageDeflate: false})
-    //ws.on('open', () => { ws.send(`${token} connected`) })
-    if(fs.existsSync(config_path)){
-        const data = JSON.parse(fs.readFileSync(config_path, { encoding: 'utf-8', JSON: true }))
-        
-        const ws = new WebSocket(`ws://localhost:${port}/${token}`, {perMessageDeflate: false})
-
-        ws.on('message', (data, isBinary) => { receiveData(data, isBinary) })
-
-        //on error/connection loss -> app quit
-        ws.on('error', (e) => { ws.close(1011, e) })
-        ws.on('close', () => { quit() })
-    }
-    
-}
-
-function createGUI(params){
-    const win = new BrowserWindow({
-        width: 800, 
-        height: 800, 
-        webPreferences: {
-        //todo: check is path right for production
-        preload: path.join(app.getAppPath() + '/src/common/api.mjs'),
-        sandbox: false,   //preloading .mjs is not compatible with sandboxing
-        }, 
-        autoHideMenuBar: true, 
-        //show: isDev(), 
-        show: true, 
-        title: `VMC Worker(${params.token})`, 
-    })
-    //todo: check is path right for production
-    const htmlpath = path.join(app.getAppPath() + '/dist/worker.html')
-    win.loadFile(htmlpath)
-    if(isDev()){ win.webContents.openDevTools() }
-
-    //page has finished loading
-    win.webContents.on('did-finish-load', () => { connectWebsocket(params.port, params.token) })
-}
-
-export default function initWorker(args){
-    app.on('ready', () => { createGUI(args) })
-    app.on('window-all-closed', () => { quit() })
-}
+*/
