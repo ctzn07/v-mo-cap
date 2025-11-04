@@ -4,6 +4,7 @@ import EventEmitter from 'node:events'
 import fs from 'node:fs'
 import { WebSocket } from 'ws'
 import { isDev, platform } from '../common/util.mjs'
+import { WorkerInterface } from '../classes/wsInterface.mjs'
 import path from 'path'
 
 const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
@@ -40,6 +41,25 @@ function createGUI(){
             const config = JSON.parse(fs.readFileSync(config_path, { encoding: 'utf-8', JSON: true }))
 
             const ws = new WebSocket(`ws://localhost:${config.User.WebsocketPort}/worker`, {perMessageDeflate: false})
+            ws.on('close', () => quit(0))
+            ws.on('error', (e) => ws.close(1011, e))
+            const wsHandler = new WorkerInterface(ws)
+
+            wsHandler.register('ping', (data) => {
+                console.log(`Worker ping received ${data}, returning pong`)
+                return 'pong' 
+            })
+            
+            wsHandler.register('disconnect', (data) => {
+                console.log('worker is quitting', data)
+                app.quit()
+                
+                return 'abayo bitch'
+                
+            })
+
+            /*
+            const ws = new WebSocket(`ws://localhost:${config.User.WebsocketPort}/worker`, {perMessageDeflate: false})
 
             ws.on('message', (data, isBinary) => {
                 const packet = JSON.parse(data)
@@ -49,6 +69,8 @@ function createGUI(){
             //on error/connection loss -> app quit
             ws.on('error', (e) => ws.close(1011, e))
             ws.on('close', () => quit(0))
+            */
+
         }
         else{
             console.log('Worker cant read config file')

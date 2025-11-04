@@ -5,7 +5,8 @@ import { exec, spawn } from 'child_process'
 
 import { config } from '../common/config.mjs'
 import { console } from '../common/logger.mjs'
-import { Worker } from '../classes/worker.mjs'
+//import { Worker } from '../classes/worker.mjs'
+import { WorkerInterface } from '../classes/wsInterface.mjs'
 
 export const wsmanager = {}
 
@@ -29,6 +30,14 @@ function createWorker(device){
     reservations.push(device)
 }
 
+/*
+const packet = {
+        id: identifier, 
+        api: path, 
+        data: o_data || null
+    }
+*/
+
 function assignWorker(ws){
     const device = reservations.shift()
     if(!device){
@@ -36,15 +45,27 @@ function assignWorker(ws){
         ws.close(3000, '401 - Unauthorized')
     }
     else{
-        workers.set(device, ws)
+        workers.set(device, new WorkerInterface(ws))
+        workers.get(device).emitter.on('error', (e) => console.error(e))
+        workers.get(device).emitter.on('close', (e) => {/*set device inactive*/})
+        setTimeout(() => {
+            console.log('sending ping')
+            workers.get(device).request('ping1', 123).then((res) => console.log(res)).catch(e => console.error(e))
+        }, 10000);
     }
 }
 
 function removeWorker(device){
     console.log(`Worker removed(${device})`)
     //TODO: send disconnect to process assigned for this device
-    workers.get(device).send(JSON.stringify({disconnect:true}))
-    workers.delete(device)
+    workers.get(device).request('disconnect')
+        .then((r) => {
+            console.log(`disconnect done: ${r}`)
+            workers.delete(device)
+        })
+        .catch(e => {
+            console.log(`disconnect request failed: ${e}`)
+        })
 }
 
 function updateWorkers(list){
