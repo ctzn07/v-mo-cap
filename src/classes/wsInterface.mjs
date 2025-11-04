@@ -29,7 +29,7 @@ export class WorkerInterface {
     #decodeData(arr){ return arr.map(n => String.fromCharCode(n)).join('') }
     
     #handleRequest(packet){
-        console.log(`handling request ${JSON.stringify(packet)}`)
+        //console.log(`handling request ${JSON.stringify(packet)}`)
         const response = {
             id: packet.id,  
             isRequest: false, 
@@ -46,7 +46,7 @@ export class WorkerInterface {
         }
         //try sending response
         try {
-            console.log(`sending response ${JSON.stringify(response)}`)
+            //console.log(`sending response ${JSON.stringify(response)}`)
             this.ws.send(JSON.stringify(response))
         }
         catch(e) { this.emitter.emit('error', e) }
@@ -55,7 +55,7 @@ export class WorkerInterface {
     
     #receive(payload, isBinary){
         const packet = {}
-        console.log('got package', payload)
+        //console.log('got package', payload)
         //TODO: check was the actual data in payload.data
         //TODO: add boolean option to exclude data from being decoded
 
@@ -88,7 +88,7 @@ export class WorkerInterface {
             this.emitter.once(requestId, (packet) => {
                 clearTimeout(timer)
                 if(packet.error){ reject(packet.error) }  //if there was an error, reject  
-                else{ resolve(packet) }    //else, resolve
+                else{ resolve(packet.data) }    //else, resolve
             })
 
             //create packet
@@ -98,7 +98,7 @@ export class WorkerInterface {
                 api: api_path, 
                 data: o_data
             }
-            console.log(`sending request ${JSON.stringify(packet)}`)
+            //console.log(`sending request ${JSON.stringify(packet)}`)
 
             //stringify and send packet
             try { this.ws.send(JSON.stringify(packet)) }

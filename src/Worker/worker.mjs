@@ -45,8 +45,8 @@ function createGUI(){
             ws.on('error', (e) => ws.close(1011, e))
             const wsHandler = new WorkerInterface(ws)
 
-            wsHandler.register('ping', (data) => {
-                console.log(`Worker ping received ${data}, returning pong`)
+            wsHandler.register('ping', function (data){
+                //console.log(`Worker ping received ${data}, returning pong`)
                 return 'pong' 
             })
             
