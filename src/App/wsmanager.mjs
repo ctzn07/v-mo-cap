@@ -21,9 +21,6 @@ const reservations = []
 class WSEmitter extends EventEmitter {}
 wsmanager.update = new WSEmitter()
 
-//TODO: create a class that manages communication over websocket
-//API request->[class <-> promise]<--communication-->[class] <-> data
-
 function createWorker(device){
     exec(`npm run worker worker="true"`)
     console.log(`New Worker(${device})`)
@@ -46,8 +43,6 @@ function assignWorker(ws){
     }
     else{
         workers.set(device, new WorkerInterface(ws))
-        workers.get(device).emitter.on('error', (e) => console.error(e))
-        workers.get(device).emitter.on('close', (e) => {/*set device inactive*/})
 
         setTimeout(() => {
             console.log('sending pings')

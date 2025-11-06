@@ -1,13 +1,8 @@
-import EventEmitter from 'node:events'
-
-class wsInterfaceEmitter extends EventEmitter {}
-
 export class WorkerInterface {
     constructor(websocket) {
-        this.buffer = new Map()
-        this.emitter = new wsInterfaceEmitter()
         this.ws = websocket
         this.ws.on('message', (data, isBinary) => this.#receive(data, isBinary))
+        this.buffer = new Map()
         this.apiMap = new Map()
     }
     
@@ -30,9 +25,8 @@ export class WorkerInterface {
         else{ response.error = `${packet.api} is not registered with endpoint` }
         //try sending response
         try { this.ws.send(JSON.stringify(response)) }
-        catch(e) { this.emitter.emit('error', e) }
+        catch(e) { /*how should endpoint handle network errors?*/ }
     }
-
     
     #receive(payload, isBinary){
         const packet = {}
@@ -42,7 +36,7 @@ export class WorkerInterface {
             else{ Object.assign(packet, JSON.parse(payload)) }
 
             if(packet.isRequest){ this.#handleRequest(packet) }
-            else{ this.emitter.emit(`${packet.id}`, packet) }
+            else{ this.buffer.get(packet.id)(packet) }
         }
         catch(e){   //data parsing failed
             packet.error = e
@@ -55,17 +49,17 @@ export class WorkerInterface {
             //create unique request id
             const requestId = crypto.randomUUID().split('-').at(-1)
 
-            //set request to expire
             const timer = setTimeout(() => {
-                this.emitter.removeAllListeners(requestId)
+                this.buffer.delete(requestId)
                 reject('Request timed out')
             }, timeout)
 
-            //set up listener for request response
-            this.emitter.once(requestId, (packet) => {
+            //construct listener
+            this.buffer.set(requestId, (packet) => {
                 clearTimeout(timer)
-                if(packet.error){ reject(packet.error) }  //if there was an error, reject  
-                else{ resolve(packet.data) }    //else, resolve
+                if(packet.error){ reject(packet.error) }
+                else{ resolve(packet.data) }
+                this.buffer.delete(requestId)
             })
 
             //create packet
@@ -80,7 +74,7 @@ export class WorkerInterface {
             try { this.ws.send(JSON.stringify(packet)) }
             catch(e) {
                 clearTimeout(timer)
-                this.emitter.removeAllListeners(requestId)
+                this.buffer.delete(requestId)
                 setTimeout(() => { reject(e) }, 100)
             }
         })
