@@ -25,12 +25,11 @@ const deviceTemplate = (d) => {
         type: 'frame', 
         horizontal: true, 
         children: [
-        //cTemplate('toggle', null, ['local', 'Devices', d, 'Active'], ['Off', 'On']), 
-        //cTemplate('toggle', null, `config/Devices/${d}/Active`, ['Off', 'On']), 
-        cTemplate('text', null, `config/Devices/${d}/label`, null), 
-        cTemplate('toggle', 'Face', `config/Devices/${d}/Face`, null), 
-        cTemplate('toggle', 'Hand', `config/Devices/${d}/Hand`, null), 
-        cTemplate('toggle', 'Body', `config/Devices/${d}/Body`, null), 
+            cTemplate('toggle', null, `session/Devices/${d}/Active`, ['Off', 'On']), 
+            cTemplate('text', null, `config/Devices/${d}/label`, null), 
+            cTemplate('toggle', 'Face', `config/Devices/${d}/Face`, null), 
+            cTemplate('toggle', 'Hand', `config/Devices/${d}/Hand`, null), 
+            cTemplate('toggle', 'Body', `config/Devices/${d}/Body`, null), 
         ] 
     }
 }

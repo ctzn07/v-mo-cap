@@ -41,32 +41,14 @@ function createGUI(){
             const config = JSON.parse(fs.readFileSync(config_path, { encoding: 'utf-8', JSON: true }))
 
             const ws = new WebSocket(`ws://localhost:${config.User.WebsocketPort}/worker`, {perMessageDeflate: false})
-            ws.on('close', () => quit(0))
-            ws.on('error', (e) => ws.close(1011, e))
             const wsHandler = new WorkerInterface(ws)
-
-            wsHandler.register('ping', data => 'pong')
-            
-            wsHandler.register('disconnect', (data) => {
-                console.log('worker is quitting', data)
-                app.quit()
-                
-                return 'abayo bitch'
+            wsHandler.on('close', (c, r) => quit(0))
+            wsHandler.on('error', (e) => ws.close(1011, e))
+            wsHandler.on('ping', (data) => {
+                return new Error('out of pongs')
+                //return 'pong'
             })
-
-            /*
-            const ws = new WebSocket(`ws://localhost:${config.User.WebsocketPort}/worker`, {perMessageDeflate: false})
-
-            ws.on('message', (data, isBinary) => {
-                const packet = JSON.parse(data)
-                if(packet.disconnect)app.quit()
-            })
-
-            //on error/connection loss -> app quit
-            ws.on('error', (e) => ws.close(1011, e))
-            ws.on('close', () => quit(0))
-            */
-
+            wsHandler.on('disconnect', (data) => { app.quit() })
         }
         else{
             console.log('Worker cant read config file')
@@ -79,21 +61,3 @@ export default function initWorker(args){
     app.on('ready', () => createGUI(args))
     app.on('window-all-closed', () => quit())
 }
-
-/*
-const wsPromise = (api, data) => {
-    let timeout
-    //unique identifier for this promise
-    const key = crypto.randomUUID()
-    return new Promise((resolve, reject) => {
-        worker.update.once(key, (data) => {
-            clearTimeout(timeout)
-            resolve(data)
-        })
-        timeout = setTimeout(() => {
-            reject(new Error(`Data request on ${api} timed out`))
-            worker.update.removeAllListeners(key)
-        }, 1000)
-    })
-}
-*/

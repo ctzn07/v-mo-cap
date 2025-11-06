@@ -43,12 +43,8 @@ function assignWorker(ws){
     }
     else{
         workers.set(device, new WorkerInterface(ws))
-
-        setTimeout(() => {
-            console.log('sending pings')
-            workers.get(device).request('ping').then((res) => console.log(`received ${res}`)).catch(e => console.error(e))
-            workers.get(device).request('ping1').then((res) => console.log(`received ${res}`)).catch(e => console.error(e))
-        }, 3000)
+        workers.get(device).on('close', (code, reason) => console.log('worker disconnected', code, reason))
+        workers.get(device).request('ping', 'this is data', 1000).then((res) => console.log(`response: ${res}`)).catch(e => console.error(e))
     }
 }
 
@@ -113,7 +109,7 @@ config.update.on('config/User/WebsocketPort', () => {
     //as long as their designated device is set to active
 })
 
-config.update.on('session/Devices/Connected', (list) => updateWorkers(list))
+config.update.on('session/Devices/Connected', (list) => {updateWorkers(list)})
 
 //1001	Going Away
 //1006	Abnormal Closure

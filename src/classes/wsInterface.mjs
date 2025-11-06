@@ -1,14 +1,20 @@
 export class WorkerInterface {
     constructor(websocket) {
         this.ws = websocket
-        this.ws.on('message', (data, isBinary) => this.#receive(data, isBinary))
         this.buffer = new Map()
         this.apiMap = new Map()
+        //set defaults in case parent does not define closure or error
+        this.apiMap.set('close', (code, reason) => console.log(code, reason))
+        this.apiMap.set('error', (e) => console.log(e))
+
+        this.ws.on('message', (data, isBinary) => this.#receive(data, isBinary))
+        this.ws.on('close', (code, reason) => this.apiMap.get('close')(code, reason) )
+        this.ws.on('error', (e) => this.apiMap.get('error')(e) )
     }
     
-    register(api, callback){ this.apiMap.set(api, callback) }
+    on(api, callback){ this.apiMap.set(api, callback) }
 
-    unregister(api){ this.apiMap.delete(api) }
+    off(api){ this.apiMap.delete(api) }
 
     #decodeData(arr){ return arr.map(n => String.fromCharCode(n)).join('') }
     
@@ -20,12 +26,23 @@ export class WorkerInterface {
         }
 
         //check if api endpoint is registered, fill in the data
-        if(this.apiMap.has(packet.api)){ response.data = this.apiMap.get(packet.api)(packet.data) }
+        if(this.apiMap.has(packet.api)){
+            const res = this.apiMap.get(packet.api)(packet.data)
+            if(res instanceof Error){
+                //if API call return value is instance of Error, this will trigger
+                //.catch response in requesting end
+                response.error = res.message
+            } 
+            else{
+                //no errors, fill in the data to response
+                response.data = res
+            }
+        }
         //api is not registered, return error
         else{ response.error = `${packet.api} is not registered with endpoint` }
         //try sending response
         try { this.ws.send(JSON.stringify(response)) }
-        catch(e) { /*how should endpoint handle network errors?*/ }
+        catch(e) { this.apiMap.get('error')(e) }
     }
     
     #receive(payload, isBinary){
@@ -43,15 +60,15 @@ export class WorkerInterface {
         }
     }
     
-    request(api_path, o_data = null, timeout = 3000){
-        
+    request(api_path, o_data = null, timeout = 3000){   
         return new Promise((resolve, reject) => {
             //create unique request id
             const requestId = crypto.randomUUID().split('-').at(-1)
 
+            //set listener to expire
             const timer = setTimeout(() => {
-                this.buffer.delete(requestId)
                 reject('Request timed out')
+                this.buffer.delete(requestId)
             }, timeout)
 
             //construct listener
@@ -62,7 +79,7 @@ export class WorkerInterface {
                 this.buffer.delete(requestId)
             })
 
-            //create packet
+            //packet template
             const packet = {
                 id: requestId, 
                 isRequest: true, 
@@ -75,7 +92,8 @@ export class WorkerInterface {
             catch(e) {
                 clearTimeout(timer)
                 this.buffer.delete(requestId)
-                setTimeout(() => { reject(e) }, 100)
+                //setTimeout(() => { reject(e) }, 100)
+                process.nextTick(() => reject(e))
             }
         })
     }

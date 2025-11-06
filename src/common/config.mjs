@@ -7,7 +7,7 @@ import { isDev } from './util.mjs'
 import { console } from './logger.mjs'
 
 //options: get, set, delete, update
-const printDebug = [] //'set', 'get', 'delete', 'emit'
+const printDebug = ['set'] //'set', 'get', 'delete', 'emit'
 
 //TODO: fix non-dev root path
 const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
@@ -117,15 +117,6 @@ config.devicelist = (list) => {
             config.set(`config/Devices/${label}`, template)
         }
     }
-    //!!! this code should not be here, as it is an exception to design rules
-    //TODO: find a workaround that doesn't require specifically setting device to inactive on disconnect
-    /*
-    for(const d of Object.keys(datastorage.config.Devices)){
-        if(!list.includes(d) && datastorage.config.Devices[d].Active){      
-            config.set(`config/Devices/${d}/Active`, false)
-        }
-    }
-    */
     config.set(`session/Devices/Connected`, list)
 }
 
