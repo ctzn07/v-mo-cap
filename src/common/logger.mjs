@@ -18,7 +18,6 @@ function shortTime(){
 
 const log_path = './console.log'
 
-
 const streamOptions = {flags : 'w', encoding: 'utf-8', autoClose: true}
 
 const logStream = fs.createWriteStream(log_path, streamOptions)

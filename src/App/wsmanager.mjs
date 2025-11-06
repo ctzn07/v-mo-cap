@@ -48,17 +48,12 @@ function assignWorker(ws){
         workers.set(device, new WorkerInterface(ws))
         workers.get(device).emitter.on('error', (e) => console.error(e))
         workers.get(device).emitter.on('close', (e) => {/*set device inactive*/})
-        /*
+
         setTimeout(() => {
-            console.log('sending ping')
+            console.log('sending pings')
             workers.get(device).request('ping').then((res) => console.log(`received ${res}`)).catch(e => console.error(e))
             workers.get(device).request('ping1').then((res) => console.log(`received ${res}`)).catch(e => console.error(e))
-        }, 5000)
-        */
-        setInterval(() => {
-            //console.log('ping->')
-            workers.get(device).request('ping').then((res) => {/*console.log(`<-${res}`)*/}).catch(e => console.error(e))
-        }, 2);
+        }, 3000)
     }
 }
 

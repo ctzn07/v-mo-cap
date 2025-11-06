@@ -1,35 +1,23 @@
 import EventEmitter from 'node:events'
-import { Logger } from '../classes/logfile.mjs'
 
 class wsInterfaceEmitter extends EventEmitter {}
 
-//const identifier = crypto.randomUUID().split('-').at(-1)
-
-//const console = new Logger(`./wsInterface${identifier}.log`)
-const console = new Logger(`./wsInterface.log`)
-
 export class WorkerInterface {
     constructor(websocket) {
+        this.buffer = new Map()
         this.emitter = new wsInterfaceEmitter()
         this.ws = websocket
         this.ws.on('message', (data, isBinary) => this.#receive(data, isBinary))
-        this.api = new Map()
+        this.apiMap = new Map()
     }
     
-    register(api, callback){
-        console.log(`${api} registered`)
-        this.api.set(api, callback)
-    }
+    register(api, callback){ this.apiMap.set(api, callback) }
 
-    unregister(api){
-        console.log(`${api} unregistered`)
-        this.api.delete(api)
-    }
+    unregister(api){ this.apiMap.delete(api) }
 
     #decodeData(arr){ return arr.map(n => String.fromCharCode(n)).join('') }
     
     #handleRequest(packet){
-        //console.log(`handling request ${JSON.stringify(packet)}`)
         const response = {
             id: packet.id,  
             isRequest: false, 
@@ -37,38 +25,27 @@ export class WorkerInterface {
         }
 
         //check if api endpoint is registered, fill in the data
-        if(this.api.has(packet.api)){
-            response.data = this.api.get(packet.api)(packet.data)
-        }
+        if(this.apiMap.has(packet.api)){ response.data = this.apiMap.get(packet.api)(packet.data) }
         //api is not registered, return error
-        else{
-            response.error = `${packet.api} is not registered with endpoint`
-        }
+        else{ response.error = `${packet.api} is not registered with endpoint` }
         //try sending response
-        try {
-            //console.log(`sending response ${JSON.stringify(response)}`)
-            this.ws.send(JSON.stringify(response))
-        }
+        try { this.ws.send(JSON.stringify(response)) }
         catch(e) { this.emitter.emit('error', e) }
     }
 
     
     #receive(payload, isBinary){
         const packet = {}
-        //console.log('got package', payload)
-        //TODO: check was the actual data in payload.data
-        //TODO: add boolean option to exclude data from being decoded
-
 
         try{    //Attempt to parse the incoming data
             if(isBinary){ Object.assign(packet, JSON.parse(this.#decodeData(payload))) }
-            else{  Object.assign(packet, JSON.parse(payload)) }
+            else{ Object.assign(packet, JSON.parse(payload)) }
 
             if(packet.isRequest){ this.#handleRequest(packet) }
             else{ this.emitter.emit(`${packet.id}`, packet) }
         }
         catch(e){   //data parsing failed
-            console.log(e)
+            packet.error = e
         }
     }
     
@@ -98,7 +75,6 @@ export class WorkerInterface {
                 api: api_path, 
                 data: o_data
             }
-            //console.log(`sending request ${JSON.stringify(packet)}`)
 
             //stringify and send packet
             try { this.ws.send(JSON.stringify(packet)) }

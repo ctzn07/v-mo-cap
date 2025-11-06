@@ -45,17 +45,13 @@ function createGUI(){
             ws.on('error', (e) => ws.close(1011, e))
             const wsHandler = new WorkerInterface(ws)
 
-            wsHandler.register('ping', function (data){
-                //console.log(`Worker ping received ${data}, returning pong`)
-                return 'pong' 
-            })
+            wsHandler.register('ping', data => 'pong')
             
             wsHandler.register('disconnect', (data) => {
                 console.log('worker is quitting', data)
                 app.quit()
                 
                 return 'abayo bitch'
-                
             })
 
             /*

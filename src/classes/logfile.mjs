@@ -3,28 +3,40 @@ import util from 'node:util'
 import { isDev } from '../common/util.mjs'
 
 export class Logger{
-    constructor(filepath){
-        this.stream = fs.createWriteStream(filepath, {flags : 'a', encoding: 'utf-8', autoClose: true})
+    constructor(identifier = ''){
+        this.id = identifier
+        this.stream = this.createStream('./console.log')
         this.log = (...e) => {
-            let message = this.shortTime() + ' LOG - '
+            let message = `${this.shortTime()} LOG (${this.id}) - `
             for(const a of e){
                 this.stringify(a) ? message += '\n' + JSON.stringify(a, null, 2) + ' ' : message += a + ' '
             }
             this.write(message)
         }
         this.error = (...e) => {
-            let message = this.shortTime() + ' ERROR - '
+            let message = `${this.shortTime()} ERROR (${this.id}) - `
             for(const a of e){
                 this.stringify(a) ? message += '\n' + JSON.stringify(a, null, 2) + ' ' : message += a + ' '
             }
             this.write(message)
         }
         this.print = (...e) => {
-            let message = this.shortTime() + ' PRINT - '
+            let message = `${this.shortTime()} PRINT (${this.id}) - `
             for(const a of e){
                 this.stringify(a) ? message += JSON.stringify(a, null, 2) + ' ' : message += a + ' '
             }
             this.write(message, false)
+        }
+    }
+
+    createStream(path){
+        //fs file exists -> create file if not
+        if(!fs.existsSync(path))try {
+            fs.writeFileSync(path)
+            return fs.createWriteStream(path, {flags : 'a', encoding: 'utf-8', autoClose: true})
+        } catch (error) {
+            this.write('ERROR - Logger failed to write logfile', false)
+            return false
         }
     }
 
@@ -48,6 +60,6 @@ export class Logger{
 
     write(msg, writelog = true){
         if(isDev())process.stdout.write(util.format(msg) + '\n')
-        if(writelog)this.stream.write(util.format(msg) + '\n')
+        if(writelog && this.stream)this.stream.write(util.format(msg) + '\n')
     }
 }
