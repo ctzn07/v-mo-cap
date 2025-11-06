@@ -117,7 +117,6 @@ config.devicelist = (list) => {
             config.set(`config/Devices/${label}`, template)
         }
     }
-    config.set(`session/Devices/Connected`, list)
 }
 
 /*

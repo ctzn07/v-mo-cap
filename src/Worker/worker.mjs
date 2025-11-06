@@ -4,7 +4,7 @@ import EventEmitter from 'node:events'
 import fs from 'node:fs'
 import { WebSocket } from 'ws'
 import { isDev, platform } from '../common/util.mjs'
-import { WorkerInterface } from '../classes/wsInterface.mjs'
+import { WsInterface } from '../classes/wsInterface.mjs'
 import path from 'path'
 
 const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
@@ -41,13 +41,10 @@ function createGUI(){
             const config = JSON.parse(fs.readFileSync(config_path, { encoding: 'utf-8', JSON: true }))
 
             const ws = new WebSocket(`ws://localhost:${config.User.WebsocketPort}/worker`, {perMessageDeflate: false})
-            const wsHandler = new WorkerInterface(ws)
+            const wsHandler = new WsInterface(ws)
             wsHandler.on('close', (c, r) => quit(0))
             wsHandler.on('error', (e) => ws.close(1011, e))
-            wsHandler.on('ping', (data) => {
-                return new Error('out of pongs')
-                //return 'pong'
-            })
+
             wsHandler.on('disconnect', (data) => { app.quit() })
         }
         else{

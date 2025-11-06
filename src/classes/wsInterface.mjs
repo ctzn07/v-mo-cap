@@ -1,4 +1,4 @@
-export class WorkerInterface {
+export class WsInterface {
     constructor(websocket) {
         this.ws = websocket
         this.buffer = new Map()
@@ -34,7 +34,7 @@ export class WorkerInterface {
                 response.error = res.message
             } 
             else{
-                //no errors, fill in the data to response
+                //no errors, fill in the data to response(undefined if api entry has no return value)
                 response.data = res
             }
         }

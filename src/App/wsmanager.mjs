@@ -6,7 +6,7 @@ import { exec, spawn } from 'child_process'
 import { config } from '../common/config.mjs'
 import { console } from '../common/logger.mjs'
 //import { Worker } from '../classes/worker.mjs'
-import { WorkerInterface } from '../classes/wsInterface.mjs'
+import { WsInterface } from '../classes/wsInterface.mjs'
 
 export const wsmanager = {}
 
@@ -42,9 +42,10 @@ function assignWorker(ws){
         ws.close(3000, '401 - Unauthorized')
     }
     else{
-        workers.set(device, new WorkerInterface(ws))
+        workers.set(device, new WsInterface(ws))
         workers.get(device).on('close', (code, reason) => console.log('worker disconnected', code, reason))
-        workers.get(device).request('ping', 'this is data', 1000).then((res) => console.log(`response: ${res}`)).catch(e => console.error(e))
+
+        //workers.get(device).request('ping', 'this is data', 1000).then((res) => console.log(`response: ${res}`)).catch(e => console.error(e))
     }
 }
 

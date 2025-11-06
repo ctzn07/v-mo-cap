@@ -59,7 +59,13 @@ function createGUI(){
     let timer = null
     ipcMain.on('devicelist', (e, list) => {
         clearTimeout(timer)
-        timer = setTimeout(() => config.devicelist(list), 500)
+        timer = setTimeout(() => {
+            config.devicelist(list) //make sure devices have config entries
+
+            //TODO: add or remove differences to session storage too
+            config.set(`session/Devices/Connected`, list)
+            
+        }, 500)
     })
 
     //Data requests events from UI
