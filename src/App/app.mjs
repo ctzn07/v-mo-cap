@@ -19,6 +19,35 @@ function updateUI(channel, data = null){
     else{ console.error(`Cannot call UI update on channel ${channel}`) }
 }
 
+//devicelist triggers multiple times for each connected usb device
+//adding a small timegate to only trigger on latest update
+let timer = null
+function manageDevices(list){
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+        config.devicelist(list) //make sure devices have config entries
+        const newList = new Set(list)
+        const oldList = new Set(Object.keys(config.get('session/Devices') || {}))
+
+        for(const device of oldList){
+            if(!newList.has(device)){
+                //new device list no longer has entry -> set inactive & delete
+                config.set(`session/Devices/${device}/Active`, false)
+                config.delete(`session/Devices/${device}`)
+            }
+        }
+        for(const device of newList){
+            if(!oldList.has(device)){
+                //device has no entry, create new
+                const template = { 
+                    Active: false, 
+                }
+                config.set(`session/Devices/${device}`, template)
+            }
+        }
+    }, 500)
+}
+
 function createGUI(){
     const win = new BrowserWindow({
         width: 1000,
@@ -54,19 +83,8 @@ function createGUI(){
     //Events for receiving data from UI
     ipcMain.on('setconfig', (e, path, value) => config.set(path, value))
     ipcMain.on('update', (e, channel) => updateUI(channel)) //generic UI update request
-    //devicelist triggers multiple times for each connected usb device
-    //adding a small timegate to only trigger on latest update
-    let timer = null
-    ipcMain.on('devicelist', (e, list) => {
-        clearTimeout(timer)
-        timer = setTimeout(() => {
-            config.devicelist(list) //make sure devices have config entries
-
-            //TODO: add or remove differences to session storage too
-            config.set(`session/Devices/Connected`, list)
-            
-        }, 500)
-    })
+    
+    ipcMain.on('devicelist', (e, list) => manageDevices(list))
 
     //Data requests events from UI
     //ipcMain.handle('getconfig', (e, path) => { return config.get(path) })

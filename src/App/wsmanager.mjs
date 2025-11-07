@@ -27,14 +27,6 @@ function createWorker(device){
     reservations.push(device)
 }
 
-/*
-const packet = {
-        id: identifier, 
-        api: path, 
-        data: o_data || null
-    }
-*/
-
 function assignWorker(ws){
     const device = reservations.shift()
     if(!device){
@@ -42,9 +34,11 @@ function assignWorker(ws){
         ws.close(3000, '401 - Unauthorized')
     }
     else{
-        workers.set(device, new WsInterface(ws))
-        workers.get(device).on('close', (code, reason) => console.log('worker disconnected', code, reason))
-
+        //workers.set(device, new WsInterface(ws))
+        //workers.get(device).on('close', (code, reason) => console.log('worker disconnected', code, reason))
+        config.set(`session/Devices/${device}/Interface`, new WsInterface(ws))
+        config.get(`session/Devices/${device}/Interface`)
+            .request('ping').then((res) => console.log(`response: ${res}`)).catch(e => console.error(e))
         //workers.get(device).request('ping', 'this is data', 1000).then((res) => console.log(`response: ${res}`)).catch(e => console.error(e))
     }
 }
@@ -52,6 +46,7 @@ function assignWorker(ws){
 function removeWorker(device){
     console.log(`Worker removed(${device})`)
     //TODO: send disconnect to process assigned for this device
+    /*
     workers.get(device).request('disconnect')
         .then((r) => {
             console.log(`disconnect done: ${r}`)
@@ -60,8 +55,31 @@ function removeWorker(device){
         .catch(e => {
             console.log(`disconnect request failed: ${e}`)
         })
+    */
+    config.get(`session/Devices/${device}/Interface`).request('disconnect')
+        .then((r) => {
+            console.log(`disconnect done: ${r}`)
+            config.set(`session/Devices/${device}/Interface`, null)
+        })
+        .catch(e => console.error(e))
+    
 }
 
+config.update.on('session/Devices', (devices) => {
+    for(const d of Object.keys(devices || {})){
+        if(devices[d].Active && !devices[d].Interface){
+            //device is active but has no interface, create new worker
+            createWorker(d)
+        }
+        if(!devices[d].Active && devices[d].Interface){
+            //device is not active and has active interface, remove worker
+            removeWorker(d)
+        }
+    }
+    
+})
+
+/*
 function updateWorkers(list){
     const oldList = new Set(workers.keys() || [])
     const newList = new Set(list || [])
@@ -72,7 +90,7 @@ function updateWorkers(list){
     //new list of connected devices does not have this device -> remove worker
     for(const d of oldList){ if(!newList.has(d)){ removeWorker(d) } }
 }
-
+*/
 
 wsmanager.start = () => {
     const wsport = config.get('config/User/WebsocketPort')
@@ -109,8 +127,6 @@ config.update.on('config/User/WebsocketPort', () => {
     //Note: Workers will automatically reconnect
     //as long as their designated device is set to active
 })
-
-config.update.on('session/Devices/Connected', (list) => {updateWorkers(list)})
 
 //1001	Going Away
 //1006	Abnormal Closure

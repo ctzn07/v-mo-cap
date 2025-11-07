@@ -7,7 +7,7 @@ import { isDev } from './util.mjs'
 import { console } from './logger.mjs'
 
 //options: get, set, delete, update
-const printDebug = ['set'] //'set', 'get', 'delete', 'emit'
+const printDebug = ['set', 'delete'] //'set', 'get', 'delete', 'emit'
 
 //TODO: fix non-dev root path
 const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
@@ -220,18 +220,16 @@ config.set = (path, value) => {
 
     writeFile(path.split('/').at(0))
     //Update datastorage with deep copy of itself
-    Object.assign(datastorage, JSON.parse(JSON.stringify(datastorage)))
+    //Object.assign(datastorage, JSON.parse(JSON.stringify(datastorage)))
     emitPath(path)
 }
 //if(route.length === 4)datastorage[route[0]][route[1]][route[2]][route[3]] = value
 
 config.delete = (path) => {
     if(printDebug.includes('delete'))console.log(`config.delete ${path}`)
-    setRef(path, null)
+    //setRef(path, null)
+    delRef(path)
     emitPath(path)
-    setTimeout(() => {
-        delRef(path)
-    }, 1000);
 }
 
 newStorage('config', config_path, configTemplate)
