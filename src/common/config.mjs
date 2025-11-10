@@ -7,7 +7,7 @@ import { isDev } from './util.mjs'
 import { console } from './logger.mjs'
 
 //options: get, set, delete, update
-const printDebug = ['set', 'delete'] //'set', 'get', 'delete', 'emit'
+const printDebug = [] //'set', 'get', 'delete', 'emit'
 
 //TODO: fix non-dev root path
 const root_path = path.join(app.getAppPath(), (isDev() ? '' : '../'))
@@ -119,39 +119,6 @@ config.devicelist = (list) => {
     }
 }
 
-/*
-//update available devices to session storage
-    const newList = new Set(list)
-    const oldList = new Set(Object.keys(config.get('session/Devices') || {}))
-
-    for(const device of oldList){
-        if(!newList.has(device)){
-            //new device list no longer has entry -> set inactive & unavailable
-            //config.set(`session/Devices/${device}/Active`, false)
-            //config.set(`session/Devices/${device}/Available`, false)
-            config.delete(`session/Devices/${device}`)
-        }
-    }
-
-    for(const device of newList){
-        if(oldList.has(device)){
-            //device has existing session entry
-            if(!datastorage.session.Devices[device].Available){
-                //but it's not marked as available -> update availability
-                //config.set(`session/Devices/${device}/Available`, true)
-            }
-        }
-        else{
-            //device has existing session entry, create new entry from template
-            const template = { 
-                Active: false, 
-            }
-            //config.set(`session/Devices/${device}`, Object.assign({}, template))
-            
-        }
-    }
-*/
-
 function cleanRoute(path){
     const route = path.split ? path.split('/') : [path]
     if(!route.at(-1))route.pop()    //remove trailing '/'
@@ -166,7 +133,7 @@ const getRef = (path) => {
         return ref[target]
     }
     catch(e){
-        console.error(`config.get failed (${route.join('/')})`)
+        //console.error(`config.get failed (${route.join('/')})`)
         return null
     }
 }
@@ -207,23 +174,27 @@ config.get = (path) => {
         return current
     }
     else{
-        console.error(`Failed to get config value( ${path} : ${current})`)
+        console.error(`Failed to get config value(${path} : ${current})`)
         return null
     }
 }
 
 config.set = (path, value) => {
-    setRef(path, value)
+    try {
+        //attempt to clone the Object to datastorage
+        setRef(path, structuredClone(value))
+    } catch (error) {
+        //Object can't be cloned, use reference instead
+        setRef(path, value)
+    }
 
     const current = getRef(path)
     if(printDebug.includes('set')){ console.log(`config.set ${path}: ${current}(${typeof current})`) }
 
     writeFile(path.split('/').at(0))
-    //Update datastorage with deep copy of itself
-    //Object.assign(datastorage, JSON.parse(JSON.stringify(datastorage)))
+
     emitPath(path)
 }
-//if(route.length === 4)datastorage[route[0]][route[1]][route[2]][route[3]] = value
 
 config.delete = (path) => {
     if(printDebug.includes('delete'))console.log(`config.delete ${path}`)
@@ -234,13 +205,3 @@ config.delete = (path) => {
 
 newStorage('config', config_path, configTemplate)
 newStorage('session', null, {})
-
-/*
-    let current = datastorage
-    for (let i = 0; i < route.length - 1; i++) {
-        const key = route[i]
-        if (!(key in current))break
-        current = current[key]
-    }
-    current[route.at(-1)] = value
-*/

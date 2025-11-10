@@ -42,7 +42,7 @@ return [
         horizontal: false, 
         children: [
             cTemplate('text', 'User Settings', null, null), 
-            cTemplate('select', 'Websocket Port', 'config/User/WebsocketPort', [8080]), 
+            cTemplate('select', 'Websocket Port', 'config/User/WebsocketPort', [8080,8081,8082]), 
             cTemplate('select', 'Preferred GPU', 'config/User/PreferredGPU', ['dGPU', 'iGPU']), 
         ],
     }, 

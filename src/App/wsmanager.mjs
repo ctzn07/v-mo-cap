@@ -5,15 +5,11 @@ import { exec, spawn } from 'child_process'
 
 import { config } from '../common/config.mjs'
 import { console } from '../common/logger.mjs'
-//import { Worker } from '../classes/worker.mjs'
 import { WsInterface } from '../classes/wsInterface.mjs'
 
 export const wsmanager = {}
 
 var wss = null
-
-const workers = new Map()
-const reservations = []
 
 //wsmanager.update.eventNames()
 
@@ -22,47 +18,48 @@ class WSEmitter extends EventEmitter {}
 wsmanager.update = new WSEmitter()
 
 function createWorker(device){
-    exec(`npm run worker worker="true"`)
-    console.log(`New Worker(${device})`)
-    reservations.push(device)
-}
+    const token = crypto.randomUUID().split('-').at(-1)
 
-function assignWorker(ws){
-    const device = reservations.shift()
-    if(!device){
-        console.error(`Unexpected websocket connection rejected`)
-        ws.close(3000, '401 - Unauthorized')
+    //event listener for the connection
+    wsmanager.update.once(token, (wsi) => {
+        console.log('worker registered')
+        config.set(`session/Devices/${device}/Interface`, wsi)
+
+        //on connection closure
+        wsi.on('close', (code, reason) => {
+            config.set(`session/Devices/${device}/Active`, false)
+            config.set(`session/Devices/${device}/Interface`, null)
+        })
+        //wsi.request('ping').then((res) => console.log(`response: ${res}`)).catch(e => console.error(e))
+    })
+
+    const args = {
+        worker: true, 
+        device: String(device), 
+        port: Number(wss.address().port), 
+        token: token, 
     }
-    else{
-        //workers.set(device, new WsInterface(ws))
-        //workers.get(device).on('close', (code, reason) => console.log('worker disconnected', code, reason))
-        config.set(`session/Devices/${device}/Interface`, new WsInterface(ws))
-        config.get(`session/Devices/${device}/Interface`)
-            .request('ping').then((res) => console.log(`response: ${res}`)).catch(e => console.error(e))
-        //workers.get(device).request('ping', 'this is data', 1000).then((res) => console.log(`response: ${res}`)).catch(e => console.error(e))
-    }
+
+    //encode JSON to launch arguments(see main.js for decode)
+    const format = (obj) => Object.keys(obj).reduce((a, c) => a += `${c}="${args[c]}" `, '')
+
+    exec(`npm run worker ${format(args)}`)
 }
 
 function removeWorker(device){
-    console.log(`Worker removed(${device})`)
-    //TODO: send disconnect to process assigned for this device
-    /*
-    workers.get(device).request('disconnect')
-        .then((r) => {
-            console.log(`disconnect done: ${r}`)
-            workers.delete(device)
-        })
-        .catch(e => {
-            console.log(`disconnect request failed: ${e}`)
-        })
-    */
-    config.get(`session/Devices/${device}/Interface`).request('disconnect')
-        .then((r) => {
-            console.log(`disconnect done: ${r}`)
-            config.set(`session/Devices/${device}/Interface`, null)
-        })
+    config.get(`session/Devices/${device}/Interface`)
+        .request('disconnect')
+        .then(() => config.set(`session/Devices/${device}/Interface`, null))
         .catch(e => console.error(e))
     
+    console.log(`Worker removed(${device})`)
+}
+
+//TODO: way to register clients, look into that when doing plugins
+function newConnection(ws){
+    const wsi = new WsInterface(ws)
+    wsi.on('console.log', msg => console.log(msg))
+    wsi.on('register-worker', (token) => wsmanager.update.emit(token, wsi))
 }
 
 config.update.on('session/Devices', (devices) => {
@@ -79,53 +76,31 @@ config.update.on('session/Devices', (devices) => {
     
 })
 
-/*
-function updateWorkers(list){
-    const oldList = new Set(workers.keys() || [])
-    const newList = new Set(list || [])
-
-    //old list does not have this device -> create new worker
-    for(const d of newList){ if(!oldList.has(d)){ createWorker(d) } }
-
-    //new list of connected devices does not have this device -> remove worker
-    for(const d of oldList){ if(!newList.has(d)){ removeWorker(d) } }
-}
-*/
-
-wsmanager.start = () => {
-    const wsport = config.get('config/User/WebsocketPort')
-
+wsmanager.start = (port) => {
+    console.log('wsmanager.start', port)
     try{
-        wss = new WebSocketServer({ port: wsport, perMessageDeflate: false, clientTracking: true })
-        wss.on('connection', (ws, req) => {
-            const route = req.url.split('/').at(-1)
-            switch (route) {
-                //suppose there will be more routes to handle later on
-                case 'worker':
-                    assignWorker(ws)
-                    break 
-                default:
-                    console.error(`Websocket server rejected connection to ${req.url}`)
-                    ws.close(3000, '401 - Unauthorized')
-                    break
-            }
-            
-        })
-        wss.on('close', (ws) => console.log('Websocket server connection closed'))
-        wss.on('listening', () => console.log(`Websocket listening port ${wsport}`))
+        wss = new WebSocketServer({ port: port, perMessageDeflate: false, clientTracking: true })
+        wss.on('connection', (ws, req) => newConnection(ws))
+        wss.on('close', (ws) => console.log('client disconnected'))
+        wss.on('listening', () => console.log(`Websocket listening port ${port}`))
         wss.on('error', (err) => console.error('Websocket error: ', err))
     }
     catch (e) { console.error('Error starting WSS - ', e) }
 }
 
-wsmanager.stop = (msg = '') => { wss.close(() => console.log(msg)) }
+wsmanager.stop = () => {
+    console.log('wsmanager.stop')
+    //note: WebsocketServer.close() gets ignored unless you supply it with callback as argument
+    wss.close(() => console.log('asd'))
+}
 
 //if websocket port changes, restart server
-config.update.on('config/User/WebsocketPort', () => {
-    wsmanager.stop(`Websocket port changed, restarting server...`)
-    wsmanager.start()
-    //Note: Workers will automatically reconnect
-    //as long as their designated device is set to active
+config.update.on('config/User/WebsocketPort', (port) => {
+    wsmanager.stop()
+    setTimeout(() => {
+        wsmanager.start(port)
+    }, 1000);
+    
 })
 
 //1001	Going Away

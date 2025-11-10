@@ -96,8 +96,8 @@ function createGUI(){
 
 //initialization script
 export default function initApp(args){
-    console.log('App initialized with arguments:', args)
-    wsmanager.start()
+    console.log('app.mjs startup arguments:', JSON.stringify(args))
+    wsmanager.start(config.get('config/User/WebsocketPort'))
     app.on('ready', () => createGUI())
 }
 
