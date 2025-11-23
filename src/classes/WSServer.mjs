@@ -1,23 +1,6 @@
 import http from 'http'
 import crypto from 'crypto'
 
-//https://nodejs.org/api/http.html#httpcreateserveroptions-requestlistener
-const httpOptions = {
-    connectionsCheckingInterval: 30000, 
-    headersTimeout: 60000, 
-    insecureHTTPParser: false, 
-    joinDuplicateHeaders: false, 
-    keepAlive: false, 
-    keepAliveInitialDelay: 0, 
-    keepAliveTimeout: 5000, 
-    maxHeaderSize: 16384, 
-    noDelay: true, 
-    requestTimeout: 300000, 
-    requireHostHeader: true, 
-    rejectNonStandardBodyWrites: false, 
-    optimizeEmptyRequests: false, 
-}
-
 export class WebSocketServer {
     constructor(port = 8080) {
         this.port = port
@@ -34,7 +17,7 @@ export class WebSocketServer {
         this.clients = new Set()
 
         // Optional: periodically send ping frames to clients
-        this.pingInterval = setInterval(() => this.pingClients(), 30000)
+        this.pingInterval = 10000
     }
 
     parseFrame(buffer) {
@@ -43,11 +26,12 @@ export class WebSocketServer {
         const fin = (firstByte & 0x80) !== 0
         const opcode = firstByte & 0x0f
 
-        /*
-        // Close frame
-        if (opcode === 0x8) return { opcode, payload: null }
-        */
-
+        let payload = null
+        
+        //opcode is "close" so payload doesn't need to be handled
+        //note: or should it?
+        if (opcode === 0x8) return { fin, opcode, payload }
+        
         const isMasked = (secondByte & 0x80) === 0x80
         let payloadLength = secondByte & 0x7f
         let offset = 2
@@ -70,6 +54,7 @@ export class WebSocketServer {
 
         if (isMasked && maskingKey) {
             data = data.map((byte, i) => byte ^ maskingKey[i % 4])
+            //note: according to google for-each is faster than .map()...
             /* or
             for (let i = 0; i < data.length; i++) {
                 data[i] ^= maskingKey[i % 4];
@@ -78,76 +63,76 @@ export class WebSocketServer {
         }
 
         //if opcode is text, convert data to string, otherwise pass the binary
-        const payload = (opcode === 0x1) ? data.toString('utf8') : data
+        payload = (opcode === 0x1) ? data.toString('utf8') : data
 
         return { fin, opcode, payload }
     }
 
     send(socket, message) {
-        const messageBuffer = Buffer.from(message);
-        const messageLength = messageBuffer.length;
+        const messageBuffer = Buffer.from(message)
+        const messageLength = messageBuffer.length
 
-        let frame;
+        let frame
 
         if (messageLength <= 125) {
             //| 0x81 | length | payload... |
             // Case 1: Short message (payload <= 125)
-            frame = Buffer.alloc(2 + messageLength);
+            frame = Buffer.alloc(2 + messageLength)
             frame[0] = 0x81; // FIN + text frame
-            frame[1] = messageLength; // no mask, just length
-            messageBuffer.copy(frame, 2);
+            frame[1] = messageLength // no mask, just length
+            messageBuffer.copy(frame, 2)
 
         } else if (messageLength <= 65535) {
             //| 0x81 | 126 | [len_hi] | [len_lo] | payload... |
             // Case 2: Medium message (payload <= 65535 → use 16-bit length)
-            frame = Buffer.alloc(4 + messageLength);
+            frame = Buffer.alloc(4 + messageLength)
             frame[0] = 0x81; // FIN + text frame
             frame[1] = 126; // 126 indicates next 2 bytes = length
-            frame.writeUInt16BE(messageLength, 2); // write 16-bit big-endian length
-            messageBuffer.copy(frame, 4);
+            frame.writeUInt16BE(messageLength, 2) // write 16-bit big-endian length
+            messageBuffer.copy(frame, 4)
 
         } else {
             //| 0x81 | 127 | [0,0,0,0] | [len_bytes_4] | payload... |
             // Case 3: Large message (payload > 65535 → use 64-bit length)
-            frame = Buffer.alloc(10 + messageLength);
+            frame = Buffer.alloc(10 + messageLength)
             frame[0] = 0x81; // FIN + text frame
             frame[1] = 127; // 127 indicates next 8 bytes = length
 
             // Write 64-bit length (Big Endian)
             // Since JS can't handle 64-bit integers directly, write as two 32-bit chunks
             frame.writeUInt32BE(0, 2); // high 32 bits (we’ll assume messages < 4GB)
-            frame.writeUInt32BE(messageLength, 6); // low 32 bits
-            messageBuffer.copy(frame, 10);
+            frame.writeUInt32BE(messageLength, 6) // low 32 bits
+            messageBuffer.copy(frame, 10)
         }
 
         socket.write(frame);
     }
 
     sendBinary(socket, buffer) {
-        const length = buffer.length;
-        let frame;
+        const length = buffer.length
+        let frame
 
         if (length <= 125) {
-            frame = Buffer.alloc(2 + length);
+            frame = Buffer.alloc(2 + length)
             frame[0] = 0x82; // FIN + binary opcode
-            frame[1] = length;
-            buffer.copy(frame, 2);
+            frame[1] = length
+            buffer.copy(frame, 2)
         } else if (length <= 65535) {
-            frame = Buffer.alloc(4 + length);
-            frame[0] = 0x82;
-            frame[1] = 126;
-            frame.writeUInt16BE(length, 2);
-            buffer.copy(frame, 4);
+            frame = Buffer.alloc(4 + length)
+            frame[0] = 0x82
+            frame[1] = 126
+            frame.writeUInt16BE(length, 2)
+            buffer.copy(frame, 4)
         } else {
-            frame = Buffer.alloc(10 + length);
-            frame[0] = 0x82;
-            frame[1] = 127;
-            frame.writeUInt32BE(0, 2);
-            frame.writeUInt32BE(length, 6);
-            buffer.copy(frame, 10);
+            frame = Buffer.alloc(10 + length)
+            frame[0] = 0x82
+            frame[1] = 127
+            frame.writeUInt32BE(0, 2)
+            frame.writeUInt32BE(length, 6)
+            buffer.copy(frame, 10)
         }
 
-        socket.write(frame);
+        socket.write(frame)
     }
 
     // Send control frame (ping/pong)
@@ -157,70 +142,87 @@ export class WebSocketServer {
         const frame = Buffer.alloc(2 + length)
 
         frame[0] = 0x80 | opcode // FIN + control opcode
-        frame[1] = length; // no mask for server→client
+        frame[1] = length // no mask for server→client
         payloadBuffer.copy(frame, 2)
 
         socket.write(frame)
     }
+    //ping client:
+    //this.sendControlFrame(client, 0x9)
 
+    onData(socket, buffer){
+        //TODO: clear existing ping timeout and create a new one
+
+        const { fin, opcode, payload } = this.parseFrame(buffer)
+
+        if (!opcode) return
+
+        if(!fin){ /*the buffer is a fragment*/ }
+
+        switch (opcode) {
+            case 0x0:   //fragmented frame
+                //TODO: add payload into fragment buffer
+                break
+
+            case 0x1: // text frame
+                //Received payload
+                //TODO: emit received data
+                break
+
+            case 0x2: // binary frame
+                //Received binary data
+                //TODO: emit received data
+                break
+
+            case 0x8: // close frame
+                //Client closed connection
+                socket.end()
+                
+                this.clients.delete(socket)
+                break
+
+            case 0x9: // ping frame
+                //Received ping → sending pong
+                this.sendControlFrame(socket, 0xA, payload)
+                break
+
+            case 0xA: // pong frame
+                //Received pong
+                //nothing to do, as any data traffic will refresh sockets isAlive status
+                break
+        }
+    }
+
+    closeSocket(socket){
+        //TODO: check how to cleanly shutdown TCP socket
+        socket.end()
+        //socket.destroy()
+        this.clients.delete(socket)
+    }
+
+    //https://nodejs.org/api/net.html#class-netsocket
     handleConnection(socket) {
         //New client connected
-        socket.isAlive = true
-        
         this.clients.add(socket)
 
+        //check connection health on regular intervals
+        const ttl = setInterval(() => {
+            if(!socket.isAlive){
+                //no alive status updates since last ping -> assume connection dead
+                clearInterval(ttl)
+                this.closeSocket(socket)
+            }
+            else{
+                //flag connection and send ping
+                socket.isAlive = false
+                this.sendControlFrame(socket, 0x9)
+            }
+        }, this.pingInterval)
+
         socket.on('data', (buffer) => {
-            //Client is sending data, thus connection must be alive
+            //Client sent data(thus connection must be alive)
             socket.isAlive = true
-            //TODO: clear existing ping timeout and create a new one
-
-            const { fin, opcode, payload } = this.parseFrame(buffer)
-
-            //NOTE: fin is true only for finished payloads
-            //so anything without fin should be put in buffer
-            /*
-            Frame	FIN	Opcode	Payload	    Action
-            1	    0	0x1	    “Hello ”	Start buffer
-            2	    0	0x0	    “fragmen”	Append
-            3	    1	0x0	    “t world!”	Combine → “Hello fragment world!”
-            */
-            if (!opcode) return
-
-            if(!fin){
-                //the buffer is a fragment
-            }
-            switch (opcode) {
-                case 0x0:
-                    //TODO: add payload into fragment buffer
-                    break
-                case 0x1: // text frame
-                    
-                    //Received payload
-                    //this.broadcast(socket, `Client says: ${payload}`)
-                    //TODO: emit received data
-                    break
-
-                case 0x2: // binary frame
-                    
-                    //Received binary data
-                    //TODO: emit received data
-                    break
-
-                case 0x8: // close frame
-                    //Client closed connection
-                    socket.end()
-                    this.clients.delete(socket)
-                    break
-
-                case 0x9: // ping
-                    //Received ping → sending pong
-                    this.sendControlFrame(socket, 0xA, payload); // reply with pong
-                    break
-
-                case 0xA: // pong
-                    //Received pong
-                    break
-            }
+            this.onData(socket, buffer)
         })
 
         socket.on('close', () => {
@@ -256,7 +258,7 @@ export class WebSocketServer {
             return
         }
 
-        const acceptKey = this.generateAcceptValue(key);
+        const acceptKey = this.generateAcceptValue(key)
 
         const responseHeaders = [
             'HTTP/1.1 101 Switching Protocols',
@@ -269,32 +271,15 @@ export class WebSocketServer {
 
         this.handleConnection(socket)
     }
-
+    
     start() {
-        this.server.listen(this.port, () => { console.log(`✅ WebSocket server running at ws://localhost:${this.port}`) })
+        this.server.listen(this.port, () => { console.log(`WebSocket server running at ws://localhost:${this.port}`) })
     }
 
     stop() {
         //TODO? send something to this.clients?
-        clearInterval(this.pingInterval)
         this.server.close()
     }
-
-    // Periodically send pings to check connection health
-    pingClients() {
-        //TODO: instead of pinging all clients at once, each client should have their own check interval
-        for (const client of this.clients) {
-            if (!client.isAlive) {
-                //Terminating unresponsive client
-                client.destroy()
-                this.clients.delete(client)
-            } else {
-                client.isAlive = false
-                this.sendControlFrame(client, 0x9) // send ping
-            }
-        }
-    }
-
 }
 
 
@@ -318,5 +303,22 @@ send(socket, message) {
     messageBuffer.copy(frame, 2)
 
     socket.write(frame)
+}
+
+//https://nodejs.org/api/http.html#httpcreateserveroptions-requestlistener
+const httpOptions = {
+    connectionsCheckingInterval: 30000, 
+    headersTimeout: 60000, 
+    insecureHTTPParser: false, 
+    joinDuplicateHeaders: false, 
+    keepAlive: false, 
+    keepAliveInitialDelay: 0, 
+    keepAliveTimeout: 5000, 
+    maxHeaderSize: 16384, 
+    noDelay: true, 
+    requestTimeout: 300000, 
+    requireHostHeader: true, 
+    rejectNonStandardBodyWrites: false, 
+    optimizeEmptyRequests: false, 
 }
 */
