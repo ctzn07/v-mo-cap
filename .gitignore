@@ -47,3 +47,5 @@ jsconfig.json
 
 # ignored assets
 src/Font/*
+
+.continue/

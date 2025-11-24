@@ -1,5 +1,4 @@
 //Module that manages tracker connections
-import { WebSocketServer } from 'ws'
 import EventEmitter from 'node:events'
 import { exec, spawn } from 'child_process'
 
@@ -9,8 +8,6 @@ import { WsInterface } from '../classes/wsInterface.mjs'
 
 export const wsmanager = {}
 
-var wss = null
-
 //wsmanager.update.eventNames()
 
 //websocket module event emitter
@@ -19,7 +16,9 @@ wsmanager.update = new WSEmitter()
 
 function createWorker(device){
     const token = crypto.randomUUID().split('-').at(-1)
+    const server_port = config.get('config/User/WebsocketPort')
 
+    /*
     //event listener for the connection
     wsmanager.update.once(token, (wsi) => {
         console.log('worker registered')
@@ -32,26 +31,33 @@ function createWorker(device){
         })
         //wsi.request('ping').then((res) => console.log(`response: ${res}`)).catch(e => console.error(e))
     })
-
+    */
+    
     const args = {
         worker: true, 
         device: String(device), 
-        port: Number(wss.address().port), 
+        port: server_port, 
         token: token, 
     }
 
     //encode JSON to launch arguments(see main.js for decode)
-    const format = (obj) => Object.keys(obj).reduce((a, c) => a += `${c}="${args[c]}" `, '')
+    const argstring = Object.keys(args).reduce((a, c) => a += `${c}="${args[c]}" `, '')
 
-    exec(`npm run worker ${format(args)}`)
+    console.log(argstring)
+    try {
+        exec(`npm run worker ${argstring}`)
+    } catch (error) {
+        console.error(error)
+    }
 }
 
 function removeWorker(device){
+    /*
     config.get(`session/Devices/${device}/Interface`)
         .request('disconnect')
         .then(() => config.set(`session/Devices/${device}/Interface`, null))
         .catch(e => console.error(e))
-    
+    */
     console.log(`Worker removed(${device})`)
 }
 
@@ -73,36 +79,4 @@ config.update.on('session/Devices', (devices) => {
             removeWorker(d)
         }
     }
-    
 })
-
-wsmanager.start = (port) => {
-    console.log('wsmanager.start', port)
-    try{
-        wss = new WebSocketServer({ port: port, perMessageDeflate: false, clientTracking: true })
-        wss.on('connection', (ws, req) => newConnection(ws))
-        wss.on('close', (ws) => console.log('client disconnected'))
-        wss.on('listening', () => console.log(`Websocket listening port ${port}`))
-        wss.on('error', (err) => console.error('Websocket error: ', err))
-    }
-    catch (e) { console.error('Error starting WSS - ', e) }
-}
-
-wsmanager.stop = () => {
-    console.log('wsmanager.stop')
-    //note: WebsocketServer.close() gets ignored unless you supply it with callback as argument
-    wss.close(() => console.log('asd'))
-}
-
-//if websocket port changes, restart server
-config.update.on('config/User/WebsocketPort', (port) => {
-    wsmanager.stop()
-    setTimeout(() => {
-        wsmanager.start(port)
-    }, 1000);
-    
-})
-
-//1001	Going Away
-//1006	Abnormal Closure
-//1012	Service Restart

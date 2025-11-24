@@ -174,7 +174,7 @@ config.get = (path) => {
         return current
     }
     else{
-        console.error(`Failed to get config value(${path} : ${current})`)
+        console.error(`Failed to get config value(${path})`)
         return null
     }
 }

@@ -1,6 +1,5 @@
 //electron script for worker backend(GUI merely acts as a worker)
 import { app, BrowserWindow, ipcMain } from 'electron'
-import { WebSocket } from 'ws'
 import { isDev, platform } from '../common/util.mjs'
 import { WsInterface } from '../classes/wsInterface.mjs'
 import path from 'path'
@@ -11,8 +10,8 @@ function quit(code){
 }
 
 function connectWS(args){
-    //connect to main process using websocket
-    const ws = new WebSocket(`ws://localhost:${args.port}`, {perMessageDeflate: false})
+    //connect to main process using websocket(no, wss is not supported)
+    const ws = new WebSocket(`ws://localhost:${args.port}/${args.token}`, {perMessageDeflate: false})
     ws.on('open', () => {
         const wsi = new WsInterface(ws)
         wsi.on('disconnect', () => quit())
@@ -54,20 +53,3 @@ export default function initWorker(args){
     connectWS(args)
     app.on('window-all-closed', () => quit())
 }
-
-/*
-if(fs.existsSync(config_path)){
-        const config = JSON.parse(fs.readFileSync(config_path, { encoding: 'utf-8', JSON: true }))
-
-        const ws = new WebSocket(`ws://localhost:${config.User.WebsocketPort}/${args.token}`, {perMessageDeflate: false})
-        const wsHandler = new WsInterface(ws)
-        wsHandler.on('close', (c, r) => quit(0))
-        wsHandler.on('error', (e) => ws.close(1011, e))
-
-        wsHandler.on('disconnect', (data) => { app.quit() })
-    }
-    else{
-        console.log('Worker cant read config file')
-        quit(1)
-    }
-*/

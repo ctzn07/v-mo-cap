@@ -4,6 +4,7 @@ import EventEmitter from 'node:events'
 import { console } from '../common/logger.mjs'
 import { config } from '../common/config.mjs'
 import { gui } from './gui.mjs'
+import { server } from './server.mjs'
 import { wsmanager } from './wsmanager.mjs'
 
 import { isDev, platform } from '../common/util.mjs'
@@ -97,12 +98,19 @@ function createGUI(){
 //initialization script
 export default function initApp(args){
     console.log('app.mjs startup arguments:', JSON.stringify(args))
-    wsmanager.start(config.get('config/User/WebsocketPort'))
-    app.on('ready', () => createGUI())
-}
 
-app.on('window-all-closed', () => {
-    wsmanager.stop('application closing')
-    if (platform() !== 'darwin') app.quit()
-    app.exit(0)
-})
+    app.on('ready', () => {
+        createGUI()
+        server.start()
+    })
+
+    app.on('window-all-closed', () => {
+        app.quit()
+        //if (platform() !== 'darwin') app.quit()
+        //setTimeout(() => { app.exit(0) }, 1000)
+    })
+
+    app.on('before-quit', () => {
+        server.stop(1001, 'Application closing')
+    })
+}

@@ -147,8 +147,6 @@ export class WebSocketServer {
 
         socket.write(frame)
     }
-    //ping client:
-    //this.sendControlFrame(client, 0x9)
 
     onData(socket, buffer){
         //TODO: clear existing ping timeout and create a new one
@@ -192,12 +190,34 @@ export class WebSocketServer {
                 break
         }
     }
+    
+    closeSocket(socket, statuscode = 1000, reason = '') {
+        try {
+            // Send a Close frame with the specified status code and reason
+            const payload = Buffer.from([statuscode >> 8 & 0xFF, statuscode & 0xFF], 'binary');
+            if (reason) { payload = Buffer.concat([payload, Buffer.from(reason)]); }
+            this.sendControlFrame(socket, 0x8, payload);
 
-    closeSocket(socket){
-        //TODO: check how to cleanly shutdown TCP socket
-        socket.end()
-        //socket.destroy()
-        this.clients.delete(socket)
+            // Wait for the close confirmation from the client
+            socket.once('close', () => {
+                console.log('Client closed connection');
+                this.clients.delete(socket);
+            });
+
+            // If no close confirmation is received within a reasonable time, forcefully close the socket
+            setTimeout(() => {
+                if (socket.writable) {
+                    socket.end();
+                    this.clients.delete(socket);
+                }
+            }, 5000); // Timeout after 5 seconds
+        } catch (error) {
+            console.error('Error closing socket:', error);
+            if (socket.writable) {
+                socket.end();
+                this.clients.delete(socket);
+            }
+        }
     }
 
     //https://nodejs.org/api/net.html#class-netsocket
@@ -245,9 +265,8 @@ export class WebSocketServer {
         //Concatenates the client key with the magic string
         return crypto
             .createHash('sha1') //SHA-1 hashes the result
-            .update(secWebSocketKey + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11')
+            .update(secWebSocketKey + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11')   //defined by the WebSocket RFC
             .digest('base64')   //Base64-encodes it
-        //"258EAFA5-E914-47DA-95CA-C5AB0DC85B11" (defined by the WebSocket RFC)
     }
 
     handleUpgrade(req, socket, head) {

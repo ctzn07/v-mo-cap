@@ -14,11 +14,10 @@ for(const arg of process.argv.slice(2)){
     Object.assign(args, {[arg.split('=')[0]]: typeConvert(arg.split('=')[1]) || true})
 }
 
-console.log('main.js startup arguments:', args)
-
 //Dynamic import based on app arguments
 function moduleLoader(modulePath){
-    import(modulePath).then(module => module.default(args))
+    console.log(`Loading module: ${modulePath} with arguments: ${JSON.stringify(args)}`)
+    import(modulePath).then(module => module.default(args))  
 }
 
 (args.worker) ? moduleLoader('./Worker/worker.mjs') : moduleLoader('./App/app.mjs')
