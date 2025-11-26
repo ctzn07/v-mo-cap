@@ -10,9 +10,12 @@ function quit(code){
 }
 
 function connectWS(args){
-    //connect to main process using websocket(no, wss is not supported)
-    const ws = new WebSocket(`ws://localhost:${args.port}/${args.token}`, {perMessageDeflate: false})
-    ws.on('open', () => {
+    //connect to main process using websocket(wss is not supported)
+    const ws = new WebSocket(`ws://localhost:${args.port}/worker?token=${args.token}`, {perMessageDeflate: false})
+    setTimeout(() => ws.send('test data'), 5000)
+}
+
+/*
         const wsi = new WsInterface(ws)
         wsi.on('disconnect', () => quit())
         wsi.on('close', () => quit())
@@ -21,9 +24,7 @@ function connectWS(args){
         setInterval(() => {
             wsi.request('console.log', 'ping')
         }, 1000);
-    })
-    
-}
+*/
 
 function createGUI(args){
     const win = new BrowserWindow({

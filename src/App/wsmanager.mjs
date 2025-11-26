@@ -43,7 +43,6 @@ function createWorker(device){
     //encode JSON to launch arguments(see main.js for decode)
     const argstring = Object.keys(args).reduce((a, c) => a += `${c}="${args[c]}" `, '')
 
-    console.log(argstring)
     try {
         exec(`npm run worker ${argstring}`)
     } catch (error) {

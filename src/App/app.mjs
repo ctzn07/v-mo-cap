@@ -93,6 +93,15 @@ function createGUI(){
     //Utility events
     ipcMain.on('logmessage', (e, msg) => { console.log(msg) })
     ipcMain.on('logerror', (e, msg) => { console.error(msg) })
+
+    //Server events
+    server.on('connect', (ws) => {
+         //client connected->create wsinterface for workers, figure out others later
+    })
+    server.on('disconnect', (ws) => {
+        //client disconnected
+    })
+    
 }
 
 //initialization script
