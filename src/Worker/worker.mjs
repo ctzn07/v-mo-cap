@@ -12,8 +12,22 @@ function quit(code){
 function connectWS(args){
     //connect to main process using websocket(wss is not supported)
     const ws = new WebSocket(`ws://localhost:${args.port}/worker?token=${args.token}`, {perMessageDeflate: false})
-    setTimeout(() => ws.send('test data'), 2000)
-    setTimeout(() => ws.close(1000, 'potato'), 3000)
+
+    var charray = ['A', 'B', 'C', 'D', 'E', 'F', 'G'] 
+
+    var randomdata = []
+    //const datacount = 65535
+    const datacount = 1024*63
+    //4194303,99.
+    //const datacount = 1024*4194303
+    //const datacount = 4194302 / 2
+
+    for(var i = 0; i < datacount; ++i){
+        randomdata.push(charray[Math.floor(Math.random() * charray.length)])
+    }
+
+    setTimeout(() => ws.send(randomdata.join('')), 2000)
+    setTimeout(() => ws.close(4111, 'abayo'), 3000)
 }
 
 /*

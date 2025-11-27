@@ -52,59 +52,32 @@ const OPCODES = {
     PONG:         0x0A
 }
 
-
-
 function extract(buffer) {
-    // --- 1. Parse Header ---
+    // --- Header ---
     const fin = (buffer[0] & 0x80) !== 0
     const opcode = buffer[0] & 0x0f
-    //If an unknown opcode is received, the receiving endpoint MUST Fail the WebSocket Connection.
-    //TODO: close the connection if opcode is not listed in OPCODES.
     const isMasked = (buffer[1] & 0x80) === 0x80
+    const size = buffer[1] & 0x7f
+    // --- Payload Length ---
 
-    // --- 2. Determine Payload Length ---
-    let payloadLength = buffer[1] & 0x7f
+    //const payloadLength = size < 126 ? size : size === 126 ? buffer.readUInt16BE(2) : buffer.readDoubleBE(2)
+    //const payloadLength = size <= 125 ? size : size <= 65535 ? buffer.readUInt16BE(2) : buffer.readUInt32BE(2)
 
-    
-    switch (payloadLength) {
-        case 126:
-            //following 2 bytes interpreted as a 16-bit unsigned integer are the payload length
-            payloadLength = buffer.readUInt16BE(2)
-            bufferReadIndex += 2
-            break
-        case 127:
-            //following 8 bytes interpreted as a 64-bit unsigned integer are the payload length
-            //note; there is readDoubleBE(offset) and readDoubleLE(offset)
-            payloadLength = buffer.readDoubleBE(2)
-            break
-        default:
-            //0-125 is the payload length
-            break
-    }
+    console.log('payload size:', buffer.length)
 
+    // --- Extract & Unmask Data ---
+    //if length < 126, key is indexes 2-6, < 65535 in indexes 4-8, past that indexes 10-14
+    //const keyByteIndex = payloadLength < 126 ? 2 : payloadLength < 65535 ? 4 : 10
+    //const keyByteIndex = payloadLength > 65535 ? 10 : payloadLength > 125 ? 4 : 2
 
-    console.log('payload length is ', payloadLength)
-
-    // --- 4. Extract & Unmask Data ---
-    //if length is less than 126, key is indexes 2-6, < 65535 in indexes 4-8, past that indexes 10-14
-    const keyByteIndex = payloadLength < 126 ? 2 : payloadLength < 65535 ? 4 : 10
+    const keyByteIndex = size < 126 ? 2 : size < 127 ? 4 : 10
     const maskingKey = buffer.slice(keyByteIndex, keyByteIndex + 4)
 
     //everything past masking key is payload data
-    let data = buffer.slice(keyByteIndex + 4)
+    const data = buffer.slice(keyByteIndex + 4, buffer.length)
 
     if (isMasked && maskingKey) {
         for (let i = 0; i < data.length; i++) { data[i] ^= maskingKey[i % 4] }
-    }
-
-    if (opcode === OPCODES.CLOSE){
-        
-        const payload = {
-            code: data.readUInt16BE(0),  
-            reason: buffer.toString('utf8', 2) || ''
-        }
-
-        return { fin, opcode, payload }
     }
 
     //if opcode is text, convert data to string, otherwise pass the binary
@@ -145,6 +118,9 @@ netserver.on('upgrade', (req, socket, head) => {
 
     //Handle socket events
     socket.on('data', (data) => {
+        //NOTE: it seems NodeJS is limiting stream.duplex buffer(data) to 1024*64-1
+        //this will limit the websocket to operate at 64KiB package size
+        //TODO: look into how to handle larger data streams
         const { fin, opcode, payload } = extract(data)
         switch (opcode) {
             case OPCODES.CONTINUATION:
@@ -154,7 +130,7 @@ netserver.on('upgrade', (req, socket, head) => {
             
             case OPCODES.TEXT:
                 //received text data
-                console.log('socket received text:', payload)
+                console.log('socket received text:')
                 break
             
             case OPCODES.BINARY:
@@ -164,9 +140,10 @@ netserver.on('upgrade', (req, socket, head) => {
         
             case OPCODES.CLOSE:
                 //received closing handshake from client, destroy socket
-                console.log('socket received close handshake with payload:')
-                console.log(`${payload.code}:${payload.reason}`)
-                //todo: extract code and reason from payload
+                const code = payload.readUInt16BE(0) || 1005
+                const reason = payload.toString('utf8', 2) || ''
+                console.log('socket received close handshake with code:reason')
+                console.log(`${code}:${reason}`)
                 socket.end()
                 break
 
@@ -181,7 +158,7 @@ netserver.on('upgrade', (req, socket, head) => {
                 break
 
             default:
-                //opcode is garbage, throw error
+                //TODO: spec mandates unknown opcodes must close the connection
                 break
         }
     })
