@@ -56,52 +56,56 @@ const OPCODES = {
 
 function extract(buffer) {
     // --- 1. Parse Header ---
-    let offset = 2
-    const firstByte = buffer[0]
-    const secondByte = buffer[1]
+    const fin = (buffer[0] & 0x80) !== 0
+    const opcode = buffer[0] & 0x0f
+    //If an unknown opcode is received, the receiving endpoint MUST Fail the WebSocket Connection.
+    //TODO: close the connection if opcode is not listed in OPCODES.
+    const isMasked = (buffer[1] & 0x80) === 0x80
 
-    const fin = (firstByte & 0x80) !== 0
-    const opcode = firstByte & 0x0f
-    const isMasked = (secondByte & 0x80) === 0x80
-
-    
-    
     // --- 2. Determine Payload Length ---
-    let payloadLength = secondByte & 0x7f
-
-    if (opcode === OPCODES.CLOSE){
-        
-        const payload = {
-            code: buffer.readUInt16BE(2),  
-            reason: buffer.toString('utf8', 2) || ''
-        }
-
-        return { fin, opcode, payload }
-    }
+    let payloadLength = buffer[1] & 0x7f
 
     
-    if (payloadLength === 126) {
-        payloadLength = buffer.readUInt16BE(offset)
-        offset += 2
-    } else if (payloadLength === 127) {
-        payloadLength = buffer.readUInt32BE(offset + 4)
-        offset += 8
+    switch (payloadLength) {
+        case 126:
+            //following 2 bytes interpreted as a 16-bit unsigned integer are the payload length
+            payloadLength = buffer.readUInt16BE(2)
+            bufferReadIndex += 2
+            break
+        case 127:
+            //following 8 bytes interpreted as a 64-bit unsigned integer are the payload length
+            //note; there is readDoubleBE(offset) and readDoubleLE(offset)
+            payloadLength = buffer.readDoubleBE(2)
+            break
+        default:
+            //0-125 is the payload length
+            break
     }
+
+
+    console.log('payload length is ', payloadLength)
 
     // --- 4. Extract & Unmask Data ---
-    let maskingKey
-    if (isMasked) {
-        maskingKey = buffer.slice(offset, offset + 4)
-        offset += 4
-    }
+    //if length is less than 126, key is indexes 2-6, < 65535 in indexes 4-8, past that indexes 10-14
+    const keyByteIndex = payloadLength < 126 ? 2 : payloadLength < 65535 ? 4 : 10
+    const maskingKey = buffer.slice(keyByteIndex, keyByteIndex + 4)
 
-    let data = buffer.slice(offset, offset + payloadLength)
+    //everything past masking key is payload data
+    let data = buffer.slice(keyByteIndex + 4)
 
     if (isMasked && maskingKey) {
         for (let i = 0; i < data.length; i++) { data[i] ^= maskingKey[i % 4] }
     }
 
-    
+    if (opcode === OPCODES.CLOSE){
+        
+        const payload = {
+            code: data.readUInt16BE(0),  
+            reason: buffer.toString('utf8', 2) || ''
+        }
+
+        return { fin, opcode, payload }
+    }
 
     //if opcode is text, convert data to string, otherwise pass the binary
     const payload = (opcode === OPCODES.TEXT) ? data.toString('utf8') : data
@@ -161,7 +165,7 @@ netserver.on('upgrade', (req, socket, head) => {
             case OPCODES.CLOSE:
                 //received closing handshake from client, destroy socket
                 console.log('socket received close handshake with payload:')
-                console.log(payload.code + ' - ' + payload.reason)
+                console.log(`${payload.code}:${payload.reason}`)
                 //todo: extract code and reason from payload
                 socket.end()
                 break
