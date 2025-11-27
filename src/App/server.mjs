@@ -6,23 +6,6 @@ import { config } from '../common/config.mjs'
 
 export const server = new EventEmitter()
 
-const serverOptions = {
-    connectionsCheckingInterval: 30000, 
-    headersTimeout: 60000, 
-    insecureHTTPParser: false, 
-    joinDuplicateHeaders: false, 
-    keepAlive: false, 
-    keepAliveInitialDelay: 0, 
-    keepAliveTimeout: 5000, 
-    maxHeaderSize: 16384, //(16 KiB)
-    maxRequestsPerSocket: 0, 
-    noDelay: true, 
-    requestTimeout: 300000, 
-    requireHostHeader: true, 
-    rejectNonStandardBodyWrites: false, 
-    optimizeEmptyRequests: false, 
-}
-
 const netserver = http.createServer({}, (req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' })
     res.end('V-Mo-Cap server.\n')
@@ -34,18 +17,27 @@ server.address = () => {
     else return netserver.address().family === 'IPv6' ? `[${netserver.address().address}]:${netserver.address().port}` : `${netserver.address().address}:${netserver.address().port}`
 }
 
-
-
 netserver.on('listening', () => { console.log(`V-Mo-Cap server running (${server.address()})`) })
 
+//https://nodejs.org/api/http.html#event-clienterror
 netserver.on('clientError', (err, socket) => {
+    //TODO? not sure does this event also occur with upgraded connections
     console.error(`Client error: ${err.message}\n`, err.stack)
     socket.end('HTTP/1.1 400 Bad Request\r\n\r\n')
 })
 
-netserver.on('close', () => { console.log(`V-Mo-Cap server stopped`) })
+netserver.on('close', () => {
+    //TODO: send closing handshake to all websockets
+    netserver.closeAllConnections()
+    console.log(`V-Mo-Cap server stopped`)
+    server.emit('close')
+})
 
+//https://nodejs.org/api/http.html#event-connect_1
 netserver.on('connect', (req, socket, head) => { console.log('server "connect" event') })
+
+//https://nodejs.org/api/http.html#event-connection
+netserver.on('connection', (socket) => { console.log('server "connection" event') })
 
 netserver.on('request', (req, res) => { console.log('server "request" event') })
 
@@ -60,6 +52,8 @@ const OPCODES = {
     PONG:         0x0A
 }
 
+
+
 function extract(buffer) {
     // --- 1. Parse Header ---
     let offset = 2
@@ -69,9 +63,22 @@ function extract(buffer) {
     const fin = (firstByte & 0x80) !== 0
     const opcode = firstByte & 0x0f
     const isMasked = (secondByte & 0x80) === 0x80
+
+    
     
     // --- 2. Determine Payload Length ---
     let payloadLength = secondByte & 0x7f
+
+    if (opcode === OPCODES.CLOSE){
+        
+        const payload = {
+            code: buffer.readUInt16BE(2),  
+            reason: buffer.toString('utf8', 2) || ''
+        }
+
+        return { fin, opcode, payload }
+    }
+
     
     if (payloadLength === 126) {
         payloadLength = buffer.readUInt16BE(offset)
@@ -80,9 +87,6 @@ function extract(buffer) {
         payloadLength = buffer.readUInt32BE(offset + 4)
         offset += 8
     }
-
-    //opcode is "close" so payload doesn't need to be handled, or should it?
-    if (opcode === OPCODES.CLOSE) return { fin, opcode, payload: null }
 
     // --- 4. Extract & Unmask Data ---
     let maskingKey
@@ -96,6 +100,8 @@ function extract(buffer) {
     if (isMasked && maskingKey) {
         for (let i = 0; i < data.length; i++) { data[i] ^= maskingKey[i % 4] }
     }
+
+    
 
     //if opcode is text, convert data to string, otherwise pass the binary
     const payload = (opcode === OPCODES.TEXT) ? data.toString('utf8') : data
@@ -123,30 +129,17 @@ netserver.on('upgrade', (req, socket, head) => {
 
     //get necessary info from update request
     const { route, params } = getRouteInfo(req)
+    //console.log(JSON.stringify(params, null, 4))
 
     if(!authCheck(route, params)){
         //not authorized, let request timeout
         return
     }
 
-    //TODO: check if route is authorized, and if it requires token from params
-    console.log(JSON.stringify(params, null, 4))
-    
+    //Create emitter to interact with socket
+    const ws = new EventEmitter()
 
-    const key = req.headers['sec-websocket-key']
-    const websocketkey = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
-    //SHA-1 hashes the result, update key is defined by the WebSocket RFC, Base64-encodes it
-    const accept = crypto.createHash('sha1').update(key + websocketkey).digest('base64')
-
-    socket.write(
-        `HTTP/1.1 101 Switching Protocols\r\n` +
-        `Upgrade: websocket\r\n` +
-        `Connection: Upgrade\r\n` +
-        `Sec-WebSocket-Accept: ${accept}\r\n` +
-        `\r\n`
-    )
-    
-    //Socket is upgraded, handle events
+    //Handle socket events
     socket.on('data', (data) => {
         const { fin, opcode, payload } = extract(data)
         switch (opcode) {
@@ -167,7 +160,10 @@ netserver.on('upgrade', (req, socket, head) => {
         
             case OPCODES.CLOSE:
                 //received closing handshake from client, destroy socket
-                console.log('socket received close handshake')
+                console.log('socket received close handshake with payload:')
+                console.log(payload.code + ' - ' + payload.reason)
+                //todo: extract code and reason from payload
+                socket.end()
                 break
 
             case OPCODES.PING:
@@ -185,12 +181,38 @@ netserver.on('upgrade', (req, socket, head) => {
                 break
         }
     })
+    //'close' event is emitted when the stream and any of its underlying resources (a file descriptor, for example) have been closed.
+    socket.on('close', () => { console.log('socket closed') })
 
-    socket.on('close', () => console.log('socket closed'))
+    //'end' event is emitted when there is no more data to be consumed from the stream.(basically upon disconnection)
+    socket.on('end', (code, reason) => {
+        //console.log(code, reason)
+        //todo: remove socket from client list
+        server.emit('disconnect', ws)
+    })
 
-    socket.on('end', () => console.log('socket end'))
+    socket.on('error', (err) => {
+        ws.emit('error', err)
+        //todo: close socket and remove socket from client list
+    })
 
-    socket.on('error', (err) => console.error('socket error:', err))
+    //broadcast new socket to listeners
+    server.emit('connect', ws)
+
+
+    const key = req.headers['sec-websocket-key']
+    const websocketkey = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
+    //SHA-1 hashes the result, update key is defined by the WebSocket RFC, Base64-encodes it
+    const accept = crypto.createHash('sha1').update(key + websocketkey).digest('base64')
+
+    //everything is set up, send response to client about upgrade acceptance
+    socket.write(
+        `HTTP/1.1 101 Switching Protocols\r\n` +
+        `Upgrade: websocket\r\n` +
+        `Connection: Upgrade\r\n` +
+        `Sec-WebSocket-Accept: ${accept}\r\n` +
+        `\r\n`
+    )
 })
 
 server.start = () => {
@@ -201,7 +223,7 @@ server.start = () => {
 
 server.stop = (code = 1001, reason = '') => {
     //todo: close all websockets with given code and reason
-    try { netserver.close((e) => { if(e)console.error(e) }) }
+    try { netserver.close() }
     catch (error) { console.error(error) }
 }
 
@@ -214,3 +236,22 @@ config.update.on('config/User/WebsocketPort', (port) => {
 //1001	Going Away
 //1006	Abnormal Closure
 //1012	Service Restart
+
+/**
+const serverOptions = {
+    connectionsCheckingInterval: 30000, 
+    headersTimeout: 60000, 
+    insecureHTTPParser: false, 
+    joinDuplicateHeaders: false, 
+    keepAlive: false, 
+    keepAliveInitialDelay: 0, 
+    keepAliveTimeout: 5000, 
+    maxHeaderSize: 16384, //(16 KiB)
+    maxRequestsPerSocket: 0, 
+    noDelay: true, 
+    requestTimeout: 300000, 
+    requireHostHeader: true, 
+    rejectNonStandardBodyWrites: false, 
+    optimizeEmptyRequests: false, 
+}
+ */

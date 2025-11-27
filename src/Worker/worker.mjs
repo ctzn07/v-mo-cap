@@ -12,7 +12,8 @@ function quit(code){
 function connectWS(args){
     //connect to main process using websocket(wss is not supported)
     const ws = new WebSocket(`ws://localhost:${args.port}/worker?token=${args.token}`, {perMessageDeflate: false})
-    setTimeout(() => ws.send('test data'), 5000)
+    setTimeout(() => ws.send('test data'), 2000)
+    setTimeout(() => ws.close(1000, 'potato'), 3000)
 }
 
 /*

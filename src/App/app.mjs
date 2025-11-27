@@ -97,9 +97,11 @@ function createGUI(){
     //Server events
     server.on('connect', (ws) => {
          //client connected->create wsinterface for workers, figure out others later
+         console.log('app.mjs: new client connection')
     })
     server.on('disconnect', (ws) => {
         //client disconnected
+        console.log('app.mjs: client disconnection')
     })
     
 }
