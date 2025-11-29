@@ -17,7 +17,7 @@ function connectWS(args){
 
     var randomdata = []
     //const datacount = 65535
-    const datacount = 1024*63
+    const datacount = 125
     //4194303,99.
     //const datacount = 1024*4194303
     //const datacount = 4194302 / 2

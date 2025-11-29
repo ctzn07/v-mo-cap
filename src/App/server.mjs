@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import EventEmitter from 'node:events'
 import { console } from '../common/logger.mjs'
 import { config } from '../common/config.mjs'
+import { Buffer } from 'node:buffer'
 
 export const server = new EventEmitter()
 
@@ -52,6 +53,21 @@ const OPCODES = {
     PONG:         0x0A
 }
 
+function getRouteInfo(req){
+    const url = new URL('ws://' + server.address() + req.url)
+    const route = url.pathname.split('/').filter(a => a).join('/')
+    const params = {}
+    //extract all search params to object
+    for (const [key, value] of url.searchParams) { params[key] = value }
+    return { route, params }
+}
+
+function authCheck(route, params){
+    //TODO: add way to register valid tokens for worker route
+    //TODO: also set up route registration/authentication for plugins later
+    return true
+}
+
 function extract(buffer) {
     // --- Header ---
     const fin = (buffer[0] & 0x80) !== 0
@@ -60,8 +76,7 @@ function extract(buffer) {
     const size = buffer[1] & 0x7f
     // --- Payload Length ---
 
-    //const payloadLength = size < 126 ? size : size === 126 ? buffer.readUInt16BE(2) : buffer.readDoubleBE(2)
-    //const payloadLength = size <= 125 ? size : size <= 65535 ? buffer.readUInt16BE(2) : buffer.readUInt32BE(2)
+    //const payloadLength = size < 126 ? size : size === 126 ? buffer.readUInt16BE(2) : buffer.readUInt32BE(2)
 
     console.log('payload size:', buffer.length)
 
@@ -86,42 +101,98 @@ function extract(buffer) {
     return { fin, opcode, payload }
 }
 
-function getRouteInfo(req){
-    const url = new URL('ws://' + server.address() + req.url)
-    const route = url.pathname.split('/').filter(a => a).join('/')
-    const params = {}
-    //extract all search params to object
-    for (const [key, value] of url.searchParams) { params[key] = value }
-    return { route, params }
+class packet{
+    constructor(data){
+        this.fin = (data[0] & 0x80) !== 0
+        this.opcode = data[0] & 0x0f
+        this.isMasked = (data[1] & 0x80) === 0x80
+    }
 }
 
-function authCheck(route, params){
-    //TODO: add way to register valid tokens for worker route
-    //TODO: also set up route registration/authentication for plugins later
-    return true
+function newPacket(data, callback){
+    /*
+    const fin = Boolean((data[0] & 0x80) !== 0)
+    const opcode = String(data[0] & 0x0f)
+    const isMasked = Boolean((data[1] & 0x80) === 0x80)
+    const size = Number(data[1] & 0x7f)
+    const length = Number(size < 126 ? size : size === 126 ? data.readUInt16BE(2) : data.readUInt32BE(2))
+    const keyByteIndex = Number(size < 126 ? 2 : size < 127 ? 4 : 10)
+    const maskingKey = JSON.parse(JSON.stringify(data.slice(keyByteIndex, keyByteIndex + 4))).data
+    */
+
+    //const fin = 
+    //const opcode = data[0] & 0x0f
+    //const isMasked = (data[1] & 0x80) === 0x80
+    const size = data[1] & 0x7f
+    const length = size < 126 ? size : size === 126 ? data.readUInt16BE(2) : data.readUInt32BE(2)
+    const keyByteIndex = size < 126 ? 2 : size < 127 ? 4 : 10
+    //const maskingKey = data.slice(keyByteIndex, keyByteIndex + 4)
+    
+    const packet = {
+        fin: (data[0] & 0x80) !== 0, 
+        opcode: data[0] & 0x0f, 
+        isMasked: (data[1] & 0x80) === 0x80, 
+        //pretty sure readUInt32BE should start with different offset 
+        maskingKey: data.slice(keyByteIndex, keyByteIndex + 4), 
+        buffer: Buffer.alloc(length),  //TODO: figure right allocation method(safe, unsafe etc)
+        bufferIndex: 0, 
+        cb: callback,
+
+        addData(d){
+            if(this.isMasked && this.maskingKey){
+                for (let i = 0; i < d.length; i++) { d[i] ^= this.maskingKey[i % 4] }
+            }
+            this.bufferIndex += d.copy(this.buffer, this.bufferIndex)
+            //buffer has all the expected data, do callback
+            if(this.bufferIndex + 1 === this.buffer.length){ this.cb(this.opcode, this.buffer) }
+        } 
+    }
+
+    if(length < size){
+        //when length read returns 0 but size is above 0, that means incoming data size is above 32bit integer, JS cant handle it
+        //throw error
+        return
+    }
+
+    //add non-header data to the package buffer
+    packet.addData(data.slice(packet.keyByteIndex))
+
+    console.log(JSON.stringify(packet))
+    return packet
 }
 
 //https://nodejs.org/api/http.html#event-upgrade_1
 netserver.on('upgrade', (req, socket, head) => {
-
     //get necessary info from update request
     const { route, params } = getRouteInfo(req)
     //console.log(JSON.stringify(params, null, 4))
 
-    if(!authCheck(route, params)){
-        //not authorized, let request timeout
-        return
-    }
+    if(!authCheck(route, params)){ return } //not authorized, let request timeout(should probably return proper unauth response)
 
     //Create emitter to interact with socket
     const ws = new EventEmitter()
 
-    //Handle socket events
+    //NOTE!!! If size of Buffer.alloc(size) or .allocUnsafe(size) is larger than buffer.constants.MAX_LENGTH or smaller than 0 , ERR_OUT_OF_RANGE is thrown.
+    //not that it should matter as JS can only deal with 32bit long arrays
+
+    //Handle socket events. NOTE: data will arrive in 65536 byte chunks.
     socket.on('data', (data) => {
-        //NOTE: it seems NodeJS is limiting stream.duplex buffer(data) to 1024*64-1
-        //this will limit the websocket to operate at 64KiB package size
-        //TODO: look into how to handle larger data streams
-        const { fin, opcode, payload } = extract(data)
+        /*
+        const dataCallback = (opcode, data) => {
+            console.log(`packet complete:${opcode} - ${data}`)
+            socket.packet = null
+        }*/
+
+        if(socket.packet){
+            //socket.packet.addData(data)
+        }else{
+            newPacket(data, () => {})
+        }
+    })
+
+    /*
+    function handleOP(fin, opcode, payload){
+        //const { fin, opcode, payload } = extract(data)
         switch (opcode) {
             case OPCODES.CONTINUATION:
                 //received partial data
@@ -161,7 +232,10 @@ netserver.on('upgrade', (req, socket, head) => {
                 //TODO: spec mandates unknown opcodes must close the connection
                 break
         }
-    })
+    }
+    */
+
+
     //'close' event is emitted when the stream and any of its underlying resources (a file descriptor, for example) have been closed.
     socket.on('close', () => { console.log('socket closed') })
 
