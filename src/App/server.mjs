@@ -101,33 +101,36 @@ function extract(buffer) {
     return { fin, opcode, payload }
 }
 
-class packet{
-    constructor(data){
-        this.fin = (data[0] & 0x80) !== 0
-        this.opcode = data[0] & 0x0f
-        this.isMasked = (data[1] & 0x80) === 0x80
-    }
-}
-
 function newPacket(data, callback){
-    /*
-    const fin = Boolean((data[0] & 0x80) !== 0)
-    const opcode = String(data[0] & 0x0f)
-    const isMasked = Boolean((data[1] & 0x80) === 0x80)
-    const size = Number(data[1] & 0x7f)
-    const length = Number(size < 126 ? size : size === 126 ? data.readUInt16BE(2) : data.readUInt32BE(2))
-    const keyByteIndex = Number(size < 126 ? 2 : size < 127 ? 4 : 10)
-    const maskingKey = JSON.parse(JSON.stringify(data.slice(keyByteIndex, keyByteIndex + 4))).data
-    */
+    const bitCheck = (d) => {
+        // If Payload length is 127, we need to read the 64-bit length starting from byte 9
+        let dataView = new DataView(data.buffer)
+        let high = dataView.getUint32(2)  // Read the first 4 bytes (high part)
+        let low = dataView.getUint32(6)  // Read the next 4 bytes (low part)
 
-    //const fin = 
-    //const opcode = data[0] & 0x0f
-    //const isMasked = (data[1] & 0x80) === 0x80
+        // Combine high and low parts to form the full 64-bit length
+        let fullLength = (BigInt(high) << 32n) | BigInt(low)
+
+        // Clamp the value to 32-bit range (if it's too large, return 0)
+        if (fullLength > 0xFFFFFFFFn) {
+            console.error('transfer too large')
+            return 0 // Return 0 if the value exceeds the 32-bit range
+        } else {
+            return Number(fullLength & 0xFFFFFFFFn); // Clamp to 32-bit
+        }
+    }
+
     const size = data[1] & 0x7f
-    const length = size < 126 ? size : size === 126 ? data.readUInt16BE(2) : data.readUInt32BE(2)
+    //const length = size < 126 ? size : size === 126 ? data.readUInt16BE(2) : data.readUInt32BE(2)
+    const length = size < 126 ? size : size === 126 ? data.readUInt16BE(2) : bitCheck()
     const keyByteIndex = size < 126 ? 2 : size < 127 ? 4 : 10
-    //const maskingKey = data.slice(keyByteIndex, keyByteIndex + 4)
-    
+
+    if(length < size){
+        //when length read returns 0 but size is above 0, that means incoming data size is above 32bit integer, JS cant handle it
+        throw new Error('Payload too large')
+    }
+    console.log('new packet with length:', length)
+
     const packet = {
         fin: (data[0] & 0x80) !== 0, 
         opcode: data[0] & 0x0f, 
@@ -139,25 +142,25 @@ function newPacket(data, callback){
         cb: callback,
 
         addData(d){
+            
             if(this.isMasked && this.maskingKey){
                 for (let i = 0; i < d.length; i++) { d[i] ^= this.maskingKey[i % 4] }
             }
-            this.bufferIndex += d.copy(this.buffer, this.bufferIndex)
+            d.copy(this.buffer, this.bufferIndex)
+            this.bufferIndex += d.length
             //buffer has all the expected data, do callback
-            if(this.bufferIndex + 1 === this.buffer.length){ this.cb(this.opcode, this.buffer) }
+            console.log(Math.floor(this.bufferIndex / this.buffer.length * 100), '%')
+            if(this.bufferIndex + 1 >= this.buffer.length){
+                console.log('transfer complete')
+                this.cb(this.opcode, this.buffer)
+            }
         } 
     }
 
-    if(length < size){
-        //when length read returns 0 but size is above 0, that means incoming data size is above 32bit integer, JS cant handle it
-        //throw error
-        return
-    }
-
     //add non-header data to the package buffer
-    packet.addData(data.slice(packet.keyByteIndex))
+    packet.addData(data.slice(keyByteIndex))
 
-    console.log(JSON.stringify(packet))
+    //console.log(JSON.stringify(packet))
     return packet
 }
 
@@ -177,16 +180,15 @@ netserver.on('upgrade', (req, socket, head) => {
 
     //Handle socket events. NOTE: data will arrive in 65536 byte chunks.
     socket.on('data', (data) => {
-        /*
-        const dataCallback = (opcode, data) => {
-            console.log(`packet complete:${opcode} - ${data}`)
-            socket.packet = null
-        }*/
 
         if(socket.packet){
-            //socket.packet.addData(data)
+            socket.packet.addData(data)
         }else{
-            newPacket(data, () => {})
+            try {
+                socket.packet = newPacket(data, (op, data) => console.log('finished transferring', data.length/1024, 'KB'))
+            } catch (error) {
+                console.error(error)
+            }
         }
     })
 
