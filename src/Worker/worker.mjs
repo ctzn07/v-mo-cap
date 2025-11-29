@@ -11,13 +11,15 @@ function quit(code){
 
 function connectWS(args){
     //connect to main process using websocket(wss is not supported)
+    //const ws = new WebSocket(`ws://localhost:${args.port}/worker?token=${args.token}`, {perMessageDeflate: false})
     const ws = new WebSocket(`ws://localhost:${args.port}/worker?token=${args.token}`, {perMessageDeflate: false})
 
-    var charray = ['A', 'B', 'C', 'D', 'E', 'F', 'G'] 
+    //var charray = ['A', 'B', 'C', 'D', 'E', 'F', 'G'] 
+    var charray = ['A', 'B'] 
 
     var randomdata = []
     //const datacount = 65535
-    const datacount = 1024*10000
+    const datacount = 1024*1024*5
     //4194303,99.
     //const datacount = 1024*4194303
     //const datacount = 4194302 / 2

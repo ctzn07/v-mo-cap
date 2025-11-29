@@ -102,65 +102,75 @@ function extract(buffer) {
 }
 
 function newPacket(data, callback){
-    const bitCheck = (d) => {
-        // If Payload length is 127, we need to read the 64-bit length starting from byte 9
-        let dataView = new DataView(data.buffer)
-        let high = dataView.getUint32(2)  // Read the first 4 bytes (high part)
-        let low = dataView.getUint32(6)  // Read the next 4 bytes (low part)
+    
+    const bitCheck = () => {
+        //honestly, I have no idea does this work because AI couldn't
+        //keep the numbers straight while explaining the byte order
+        const dataView = new DataView(data.buffer)
+        const high = dataView.getUint32(2)  // Read the first 4 bytes (high part)
+        const low = dataView.getUint32(6)  // Read the next 4 bytes (low part)
 
         // Combine high and low parts to form the full 64-bit length
-        let fullLength = (BigInt(high) << 32n) | BigInt(low)
+        const fullLength = (BigInt(high) << 32n) | BigInt(low)
 
-        // Clamp the value to 32-bit range (if it's too large, return 0)
-        if (fullLength > 0xFFFFFFFFn) {
-            console.error('transfer too large')
-            return 0 // Return 0 if the value exceeds the 32-bit range
-        } else {
-            return Number(fullLength & 0xFFFFFFFFn); // Clamp to 32-bit
-        }
+        // Return 0 if the lenght exceeds the 32-bit range, otherwise 32-bit value
+        return (fullLength > 0xFFFFFFFFn) ? 0 : Number(fullLength & 0xFFFFFFFFn)
     }
 
+    // Extract the RSV1, RSV2, and RSV3 bits by shifting and masking
+    const RSV1 = (data[0] >> 7) & 1  // Bit 7 (highest bit)
+    const RSV2 = (data[0] >> 6) & 1  // Bit 6
+    const RSV3 = (data[0] >> 5) & 1  // Bit 5
+
+    //RSV1 is deflate compression
+    //console.log('RSV bits:', RSV1, RSV2, RSV3)
+
+    //read data size
     const size = data[1] & 0x7f
-    //const length = size < 126 ? size : size === 126 ? data.readUInt16BE(2) : data.readUInt32BE(2)
     const length = size < 126 ? size : size === 126 ? data.readUInt16BE(2) : bitCheck()
+
+    //determine masking key starting index
     const keyByteIndex = size < 126 ? 2 : size < 127 ? 4 : 10
 
     if(length < size){
         //when length read returns 0 but size is above 0, that means incoming data size is above 32bit integer, JS cant handle it
         throw new Error('Payload too large')
     }
-    console.log('new packet with length:', length)
 
     const packet = {
         fin: (data[0] & 0x80) !== 0, 
         opcode: data[0] & 0x0f, 
         isMasked: (data[1] & 0x80) === 0x80, 
-        //pretty sure readUInt32BE should start with different offset 
         maskingKey: data.slice(keyByteIndex, keyByteIndex + 4), 
-        buffer: Buffer.alloc(length),  //TODO: figure right allocation method(safe, unsafe etc)
+        //TODO: double-check which allocation method should be used https://nodejs.org/api/buffer.html#class-buffer
+        buffer: Buffer.alloc(length),  
         bufferIndex: 0, 
         cb: callback,
 
+        //NOTE: There should be(?) extension data for permessage-deflate(4 bytes) after
+        //masking key, can't confirm or deny is this the case since nobody seems to know
+
         addData(d){
-            
             if(this.isMasked && this.maskingKey){
-                for (let i = 0; i < d.length; i++) { d[i] ^= this.maskingKey[i % 4] }
+                for (let i = 0; i < d.length; i++){
+                    //write (d)ata to buffer, not sure should the masking index be relative to d or bufferIndex
+                    this.buffer.writeUInt8(d[i] ^ this.maskingKey[this.bufferIndex % 4], this.bufferIndex)
+                    this.bufferIndex++
+                }
             }
-            d.copy(this.buffer, this.bufferIndex)
-            this.bufferIndex += d.length
+            //console.log(Math.floor(this.bufferIndex / this.buffer.length * 100), '%')
+            //console.log(this.bufferIndex, '/', this.buffer.length)
+
             //buffer has all the expected data, do callback
-            console.log(Math.floor(this.bufferIndex / this.buffer.length * 100), '%')
-            if(this.bufferIndex + 1 >= this.buffer.length){
-                console.log('transfer complete')
-                this.cb(this.opcode, this.buffer)
+            if(this.bufferIndex === this.buffer.length){
+                this.cb(this.fin, this.opcode, this.buffer)
             }
         } 
     }
 
-    //add non-header data to the package buffer
-    packet.addData(data.slice(keyByteIndex))
+    //add non-header data to the package buffer, offsetting by those mysterious 4 bytes
+    packet.addData(data.slice(keyByteIndex + 4))
 
-    //console.log(JSON.stringify(packet))
     return packet
 }
 
@@ -175,17 +185,17 @@ netserver.on('upgrade', (req, socket, head) => {
     //Create emitter to interact with socket
     const ws = new EventEmitter()
 
-    //NOTE!!! If size of Buffer.alloc(size) or .allocUnsafe(size) is larger than buffer.constants.MAX_LENGTH or smaller than 0 , ERR_OUT_OF_RANGE is thrown.
-    //not that it should matter as JS can only deal with 32bit long arrays
-
-    //Handle socket events. NOTE: data will arrive in 65536 byte chunks.
+    //Handle socket events. 
     socket.on('data', (data) => {
-
+        //NOTE: data will arrive in 65536 byte chunks.
         if(socket.packet){
             socket.packet.addData(data)
         }else{
             try {
-                socket.packet = newPacket(data, (op, data) => console.log('finished transferring', data.length/1024, 'KB'))
+                socket.packet = newPacket(data, (fin, op, data) => {
+                    //TODO: throw fin,opcode and data to opcode switch
+                    console.log('finished transferring', data.length/1024, 'KB')
+                })
             } catch (error) {
                 console.error(error)
             }
@@ -257,19 +267,20 @@ netserver.on('upgrade', (req, socket, head) => {
     server.emit('connect', ws)
 
 
+    console.log(JSON.stringify(req.headers, null, 4))
     const key = req.headers['sec-websocket-key']
     const websocketkey = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
+
     //SHA-1 hashes the result, update key is defined by the WebSocket RFC, Base64-encodes it
     const accept = crypto.createHash('sha1').update(key + websocketkey).digest('base64')
 
     //everything is set up, send response to client about upgrade acceptance
     socket.write(
-        `HTTP/1.1 101 Switching Protocols\r\n` +
-        `Upgrade: websocket\r\n` +
-        `Connection: Upgrade\r\n` +
-        `Sec-WebSocket-Accept: ${accept}\r\n` +
-        `\r\n`
-    )
+        `HTTP/1.1 101 Switching Protocols\r\n` + 
+        `Upgrade: websocket\r\n` + 
+        `Connection: Upgrade\r\n` + 
+        `Sec-WebSocket-Accept: ${accept}\r\n` + 
+        `\r\n`)
 })
 
 server.start = () => {
