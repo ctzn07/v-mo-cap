@@ -14,7 +14,6 @@ const netserver = http.createServer({}, (req, res) => {
 
 server.address = () => {
     if(!netserver.listening)return null
-    //todo: return null if server is not on
     else return netserver.address().family === 'IPv6' ? `[${netserver.address().address}]:${netserver.address().port}` : `${netserver.address().address}:${netserver.address().port}`
 }
 
@@ -53,6 +52,7 @@ const OPCODES = {
     PONG:         0x0A
 }
 
+
 function getRouteInfo(req){
     const url = new URL('ws://' + server.address() + req.url)
     const route = url.pathname.split('/').filter(a => a).join('/')
@@ -68,44 +68,9 @@ function authCheck(route, params){
     return true
 }
 
-function extract(buffer) {
-    // --- Header ---
-    const fin = (buffer[0] & 0x80) !== 0
-    const opcode = buffer[0] & 0x0f
-    const isMasked = (buffer[1] & 0x80) === 0x80
-    const size = buffer[1] & 0x7f
-    // --- Payload Length ---
-
-    //const payloadLength = size < 126 ? size : size === 126 ? buffer.readUInt16BE(2) : buffer.readUInt32BE(2)
-
-    console.log('payload size:', buffer.length)
-
-    // --- Extract & Unmask Data ---
-    //if length < 126, key is indexes 2-6, < 65535 in indexes 4-8, past that indexes 10-14
-    //const keyByteIndex = payloadLength < 126 ? 2 : payloadLength < 65535 ? 4 : 10
-    //const keyByteIndex = payloadLength > 65535 ? 10 : payloadLength > 125 ? 4 : 2
-
-    const keyByteIndex = size < 126 ? 2 : size < 127 ? 4 : 10
-    const maskingKey = buffer.slice(keyByteIndex, keyByteIndex + 4)
-
-    //everything past masking key is payload data
-    const data = buffer.slice(keyByteIndex + 4, buffer.length)
-
-    if (isMasked && maskingKey) {
-        for (let i = 0; i < data.length; i++) { data[i] ^= maskingKey[i % 4] }
-    }
-
-    //if opcode is text, convert data to string, otherwise pass the binary
-    const payload = (opcode === OPCODES.TEXT) ? data.toString('utf8') : data
-
-    return { fin, opcode, payload }
-}
-
-function newPacket(data, callback){
-    
+function newPacket(data, callback){   
     const bitCheck = () => {
-        //honestly, I have no idea does this work because AI couldn't
-        //keep the numbers straight while explaining the byte order
+        //No idea does this even work(AI kept fumbling the explanation)
         const dataView = new DataView(data.buffer)
         const high = dataView.getUint32(2)  // Read the first 4 bytes (high part)
         const low = dataView.getUint32(6)  // Read the next 4 bytes (low part)
@@ -113,7 +78,7 @@ function newPacket(data, callback){
         // Combine high and low parts to form the full 64-bit length
         const fullLength = (BigInt(high) << 32n) | BigInt(low)
 
-        // Return 0 if the lenght exceeds the 32-bit range, otherwise 32-bit value
+        // Return 0 if the lenght exceeds the 32-bit range, otherwise return 32-bit value
         return (fullLength > 0xFFFFFFFFn) ? 0 : Number(fullLength & 0xFFFFFFFFn)
     }
 
@@ -122,8 +87,8 @@ function newPacket(data, callback){
     const RSV2 = (data[0] >> 6) & 1  // Bit 6
     const RSV3 = (data[0] >> 5) & 1  // Bit 5
 
-    //RSV1 is deflate compression
-    //console.log('RSV bits:', RSV1, RSV2, RSV3)
+    //NOTE: even if RSV1 bit is enabled(perMessageDeflate), the extension data isn't included in the payload
+    //TODO: reject packets with RSV2 & 3, as this is not spec compliant server
 
     //read data size
     const size = data[1] & 0x7f
@@ -132,10 +97,8 @@ function newPacket(data, callback){
     //determine masking key starting index
     const keyByteIndex = size < 126 ? 2 : size < 127 ? 4 : 10
 
-    if(length < size){
-        //when length read returns 0 but size is above 0, that means incoming data size is above 32bit integer, JS cant handle it
-        throw new Error('Payload too large')
-    }
+    //if length is less than size, payload size was not read right(above 32bit integer range)
+    if(length < size){ throw new Error('Payload too large') }
 
     const packet = {
         fin: (data[0] & 0x80) !== 0, 
@@ -145,34 +108,43 @@ function newPacket(data, callback){
         //TODO: double-check which allocation method should be used https://nodejs.org/api/buffer.html#class-buffer
         buffer: Buffer.alloc(length),  
         bufferIndex: 0, 
+        timeout: null, 
+        error: null, 
         cb: callback,
 
-        //NOTE: There should be(?) extension data for permessage-deflate(4 bytes) after
-        //masking key, can't confirm or deny is this the case since nobody seems to know
+        addData(data){
+            clearTimeout(this.timeout)
 
-        addData(d){
             if(this.isMasked && this.maskingKey){
-                for (let i = 0; i < d.length; i++){
-                    //write (d)ata to buffer, not sure should the masking index be relative to d or bufferIndex
-                    this.buffer.writeUInt8(d[i] ^ this.maskingKey[this.bufferIndex % 4], this.bufferIndex)
+                //unmask data to buffer
+                for (let i = 0; i < data.length; i++){
+                    try { this.buffer.writeUInt8(data[i] ^ this.maskingKey[this.bufferIndex % 4], this.bufferIndex) } 
+                    catch (error) {
+                        this.error = `(${this.bufferIndex}/${this.buffer.length}): ${error}`
+                        break
+                    }
                     this.bufferIndex++
                 }
             }
-            //console.log(Math.floor(this.bufferIndex / this.buffer.length * 100), '%')
-            //console.log(this.bufferIndex, '/', this.buffer.length)
 
             //buffer has all the expected data, do callback
             if(this.bufferIndex === this.buffer.length){
-                this.cb(this.fin, this.opcode, this.buffer)
+                this.cb({fin: this.fin, op: this.opcode, data: this.buffer})
             }
-        } 
+            else{
+                this.timeout = setTimeout(() => { this.error = 'Packet timed out' }, 2000)
+            }
+        }
     }
 
-    //add non-header data to the package buffer, offsetting by those mysterious 4 bytes
+    //start reading payload after masking key
+    //keyByteIndex + length of the masking key(4bytes)
     packet.addData(data.slice(keyByteIndex + 4))
 
     return packet
 }
+
+
 
 //https://nodejs.org/api/http.html#event-upgrade_1
 netserver.on('upgrade', (req, socket, head) => {
@@ -186,74 +158,63 @@ netserver.on('upgrade', (req, socket, head) => {
     const ws = new EventEmitter()
 
     //Handle socket events. 
-    socket.on('data', (data) => {
-        //NOTE: data will arrive in 65536 byte chunks.
-        if(socket.packet){
-            socket.packet.addData(data)
+    socket.on('data', (data) => {   //NOTE: data will arrive in 65536 byte chunks. 
+        if(socket.packet){  //packet exists, add data to it
+            try{
+                socket.packet.addData(data)
+            }
+            catch(error){   //error adding data, close socket with error
+                
+            }
         }else{
             try {
-                socket.packet = newPacket(data, (fin, op, data) => {
-                    //TODO: throw fin,opcode and data to opcode switch
-                    console.log('finished transferring', data.length/1024, 'KB')
-                })
-            } catch (error) {
-                console.error(error)
+                socket.packet = newPacket(data, (packet) => {
+                    switch (packet.op) {
+                        case OPCODES.CONTINUATION:  //received partial data
+                            console.log('socket received partial packet')
+                            break
+                        
+                        case OPCODES.TEXT:          //received text data
+                            console.log('socket received text:')
+                            break
+                        
+                        case OPCODES.BINARY:        //received binary data
+                            console.log('socket received binary')
+                            break
+                    
+                        case OPCODES.CLOSE:         //received closing handshake from client
+                            //const code = payload.readUInt16BE(0) || 1005
+                            //const reason = payload.toString('utf8', 2) || ''
+                            console.log('socket received close handshake with code:reason')
+                            //socket.end()
+                            break
+
+                        case OPCODES.PING:          //received ping, send pong
+                            console.log('socket received ping')
+                            break
+
+                        case OPCODES.PONG:          //received pong, update alive status          
+                            console.log('socket received pong')
+                            break
+
+                        default:
+                            //TODO: spec mandates unknown opcodes must close the connection
+                            break
+                    }
+                    socket.packet = null
+                }) 
+            }
+            catch (error) {   //error reading header, close the socket with error
+                
             }
         }
     })
-
-    /*
-    function handleOP(fin, opcode, payload){
-        //const { fin, opcode, payload } = extract(data)
-        switch (opcode) {
-            case OPCODES.CONTINUATION:
-                //received partial data
-                console.log('socket received partial packet')
-                break
-            
-            case OPCODES.TEXT:
-                //received text data
-                console.log('socket received text:')
-                break
-            
-            case OPCODES.BINARY:
-                //received binary data
-                console.log('socket received binary')
-                break
-        
-            case OPCODES.CLOSE:
-                //received closing handshake from client, destroy socket
-                const code = payload.readUInt16BE(0) || 1005
-                const reason = payload.toString('utf8', 2) || ''
-                console.log('socket received close handshake with code:reason')
-                console.log(`${code}:${reason}`)
-                socket.end()
-                break
-
-            case OPCODES.PING:
-                //received ping, send pong
-                console.log('socket received ping')
-                break
-
-            case OPCODES.PONG:
-                //received pong, update alive status
-                console.log('socket received pong')
-                break
-
-            default:
-                //TODO: spec mandates unknown opcodes must close the connection
-                break
-        }
-    }
-    */
-
 
     //'close' event is emitted when the stream and any of its underlying resources (a file descriptor, for example) have been closed.
     socket.on('close', () => { console.log('socket closed') })
 
     //'end' event is emitted when there is no more data to be consumed from the stream.(basically upon disconnection)
     socket.on('end', (code, reason) => {
-        //console.log(code, reason)
         //todo: remove socket from client list
         server.emit('disconnect', ws)
     })
@@ -266,8 +227,6 @@ netserver.on('upgrade', (req, socket, head) => {
     //broadcast new socket to listeners
     server.emit('connect', ws)
 
-
-    console.log(JSON.stringify(req.headers, null, 4))
     const key = req.headers['sec-websocket-key']
     const websocketkey = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
 
@@ -304,6 +263,50 @@ config.update.on('config/User/WebsocketPort', (port) => {
 //1001	Going Away
 //1006	Abnormal Closure
 //1012	Service Restart
+
+/*
+    function handleOP(fin, opcode, payload){
+        //const { fin, opcode, payload } = extract(data)
+        
+    }
+    */
+
+
+/**
+function extract(buffer) {
+    // --- Header ---
+    const fin = (buffer[0] & 0x80) !== 0
+    const opcode = buffer[0] & 0x0f
+    const isMasked = (buffer[1] & 0x80) === 0x80
+    const size = buffer[1] & 0x7f
+    // --- Payload Length ---
+
+    //const payloadLength = size < 126 ? size : size === 126 ? buffer.readUInt16BE(2) : buffer.readUInt32BE(2)
+
+    console.log('payload size:', buffer.length)
+
+    // --- Extract & Unmask Data ---
+    //if length < 126, key is indexes 2-6, < 65535 in indexes 4-8, past that indexes 10-14
+    //const keyByteIndex = payloadLength < 126 ? 2 : payloadLength < 65535 ? 4 : 10
+    //const keyByteIndex = payloadLength > 65535 ? 10 : payloadLength > 125 ? 4 : 2
+
+    const keyByteIndex = size < 126 ? 2 : size < 127 ? 4 : 10
+    const maskingKey = buffer.slice(keyByteIndex, keyByteIndex + 4)
+
+    //everything past masking key is payload data
+    const data = buffer.slice(keyByteIndex + 4, buffer.length)
+
+    if (isMasked && maskingKey) {
+        for (let i = 0; i < data.length; i++) { data[i] ^= maskingKey[i % 4] }
+    }
+
+    //if opcode is text, convert data to string, otherwise pass the binary
+    const payload = (opcode === OPCODES.TEXT) ? data.toString('utf8') : data
+
+    return { fin, opcode, payload }
+}
+*/
+
 
 /**
 const serverOptions = {
