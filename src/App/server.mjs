@@ -68,80 +68,105 @@ function authCheck(route, params){
     return true
 }
 
-function newPacket(data, callback){   
-    const bitCheck = () => {
-        //No idea does this even work(AI kept fumbling the explanation)
-        const dataView = new DataView(data.buffer)
-        const high = dataView.getUint32(2)  // Read the first 4 bytes (high part)
-        const low = dataView.getUint32(6)  // Read the next 4 bytes (low part)
-
-        // Combine high and low parts to form the full 64-bit length
-        const fullLength = (BigInt(high) << 32n) | BigInt(low)
-
-        // Return 0 if the lenght exceeds the 32-bit range, otherwise return 32-bit value
-        return (fullLength > 0xFFFFFFFFn) ? 0 : Number(fullLength & 0xFFFFFFFFn)
-    }
-
-    // Extract the RSV1, RSV2, and RSV3 bits by shifting and masking
-    const RSV1 = (data[0] >> 7) & 1  // Bit 7 (highest bit)
-    const RSV2 = (data[0] >> 6) & 1  // Bit 6
-    const RSV3 = (data[0] >> 5) & 1  // Bit 5
-
-    //NOTE: even if RSV1 bit is enabled(perMessageDeflate), the extension data isn't included in the payload
-    //TODO: reject packets with RSV2 & 3, as this is not spec compliant server
-
-    //read data size
-    const size = data[1] & 0x7f
-    const length = size < 126 ? size : size === 126 ? data.readUInt16BE(2) : bitCheck()
-
-    //determine masking key starting index
-    const keyByteIndex = size < 126 ? 2 : size < 127 ? 4 : 10
-
-    //if length is less than size, payload size was not read right(above 32bit integer range)
-    if(length < size){ throw new Error('Payload too large') }
-
-    const packet = {
-        fin: (data[0] & 0x80) !== 0, 
-        opcode: data[0] & 0x0f, 
-        isMasked: (data[1] & 0x80) === 0x80, 
-        maskingKey: data.slice(keyByteIndex, keyByteIndex + 4), 
+function newDataManager(socket, onComplete, onError){   
+    socket.packet = {
+        active: false, 
+        rsv: [], 
+        fin: null, 
+        opcode: null, 
+        isMasked: null, 
+        maskingKey: null, 
         //TODO: double-check which allocation method should be used https://nodejs.org/api/buffer.html#class-buffer
-        buffer: Buffer.alloc(length),  
+        buffer: null,  
         bufferIndex: 0, 
-        timeout: null, 
-        error: null, 
-        cb: callback,
+        onCompleteCB: onComplete, 
+        onErrorCB: onError, 
 
-        addData(data){
-            clearTimeout(this.timeout)
-
+        write(data){
             if(this.isMasked && this.maskingKey){
                 //unmask data to buffer
                 for (let i = 0; i < data.length; i++){
-                    try { this.buffer.writeUInt8(data[i] ^ this.maskingKey[this.bufferIndex % 4], this.bufferIndex) } 
+                    try {
+                        this.buffer.writeUInt8(data[i] ^ this.maskingKey[this.bufferIndex % 4], this.bufferIndex)
+                        this.bufferIndex++
+                    }
                     catch (error) {
-                        this.error = `(${this.bufferIndex}/${this.buffer.length}): ${error}`
+                        this.onErrorCB(error)
+                        this.active = false
                         break
                     }
-                    this.bufferIndex++
                 }
             }
 
             //buffer has all the expected data, do callback
             if(this.bufferIndex === this.buffer.length){
-                this.cb({fin: this.fin, op: this.opcode, data: this.buffer})
+                this.onCompleteCB({fin: this.fin, op: this.opcode, data: this.buffer})
+                this.active = false
             }
-            else{
-                this.timeout = setTimeout(() => { this.error = 'Packet timed out' }, 2000)
+        }, 
+
+        new(data){
+            this.active = true
+            // Extract the RSV1, RSV2, and RSV3 bits by shifting and masking
+            this.rsv.length = 0
+            this.rsv[0] = (data[0] >> 7) & 1  // Bit 7 (highest bit)
+            this.rsv[1] = (data[0] >> 6) & 1  // Bit 6
+            this.rsv[2] = (data[0] >> 5) & 1  // Bit 5
+            //NOTE: even if RSV1 bit is enabled(perMessageDeflate), the extension data isn't included in the payload
+            //TODO: reject packets with RSV2 & 3, as this is not spec compliant server
+
+            this.fin = null
+            this.fin = (data[0] & 0x80) !== 0
+            this.opcode = null
+            this.opcode = data[0] & 0x0f
+            this.isMasked = null
+            this.isMasked = (data[1] & 0x80) === 0x80
+
+            if(!Object.values(OPCODES).includes(this.opcode)){
+                this.onErrorCB('Unknown OPCODE')
+                this.active = false
+                return
             }
-        }
+
+            const dataLengthCheck = () => {
+                const dataView = new DataView(data.buffer)
+                const high = dataView.getUint32(2)  // Read the first 4 bytes (high part)
+                const low = dataView.getUint32(6)  // Read the next 4 bytes (low part)
+
+                // Combine high and low parts to form the full 64-bit length
+                const fullLength = (BigInt(high) << 32n) | BigInt(low)
+
+                // Return 0 if the lenght exceeds the 32-bit range, otherwise return 32-bit value
+                return (fullLength > 0xFFFFFFFFn) ? 0 : Number(fullLength & 0xFFFFFFFFn)
+            }
+
+            //read data size
+            const size = data[1] & 0x7f
+            const length = size < 126 ? size : size === 126 ? data.readUInt16BE(2) : dataLengthCheck()
+
+            //if length is less than size, payload size was not read right(above 32bit integer range)
+            if(length < size){
+                this.onErrorCB('Payload too large')
+                this.active = false
+                return
+            }
+            //determine masking key starting index
+            const keyByteIndex = size < 126 ? 2 : size < 127 ? 4 : 10
+            this.maskingKey = null
+            this.maskingKey = data.slice(keyByteIndex, keyByteIndex + 4)
+
+            //(reset and)allocate buffer
+            this.bufferIndex = 0
+            this.buffer = null
+            this.buffer = Buffer.alloc(length)  
+
+            //start reading payload after masking key
+            //keyByteIndex + length of the masking key(4bytes)
+            this.write(data.slice(keyByteIndex + 4))
+        }, 
+
+        data(chunk){ this.active ? this.write(chunk) : this.new(chunk) },
     }
-
-    //start reading payload after masking key
-    //keyByteIndex + length of the masking key(4bytes)
-    packet.addData(data.slice(keyByteIndex + 4))
-
-    return packet
 }
 
 
@@ -157,58 +182,20 @@ netserver.on('upgrade', (req, socket, head) => {
     //Create emitter to interact with socket
     const ws = new EventEmitter()
 
+    const dataComplete = (packet) => {
+        //{fin: this.fin, op: this.opcode, data: this.buffer}
+        console.log('completed', packet.fin, packet.op, packet.data.length)
+    }
+    const dataError = (err) => {
+        //socket data errors are severe enough to warrant disconnecting the client
+        //TODO: kill connection
+        console.error(err)
+    }
+
+    newDataManager(socket,  dataComplete, dataError)
     //Handle socket events. 
-    socket.on('data', (data) => {   //NOTE: data will arrive in 65536 byte chunks. 
-        if(socket.packet){  //packet exists, add data to it
-            try{
-                socket.packet.addData(data)
-            }
-            catch(error){   //error adding data, close socket with error
-                
-            }
-        }else{
-            try {
-                socket.packet = newPacket(data, (packet) => {
-                    switch (packet.op) {
-                        case OPCODES.CONTINUATION:  //received partial data
-                            console.log('socket received partial packet')
-                            break
-                        
-                        case OPCODES.TEXT:          //received text data
-                            console.log('socket received text:')
-                            break
-                        
-                        case OPCODES.BINARY:        //received binary data
-                            console.log('socket received binary')
-                            break
-                    
-                        case OPCODES.CLOSE:         //received closing handshake from client
-                            //const code = payload.readUInt16BE(0) || 1005
-                            //const reason = payload.toString('utf8', 2) || ''
-                            console.log('socket received close handshake with code:reason')
-                            //socket.end()
-                            break
-
-                        case OPCODES.PING:          //received ping, send pong
-                            console.log('socket received ping')
-                            break
-
-                        case OPCODES.PONG:          //received pong, update alive status          
-                            console.log('socket received pong')
-                            break
-
-                        default:
-                            //TODO: spec mandates unknown opcodes must close the connection
-                            break
-                    }
-                    socket.packet = null
-                }) 
-            }
-            catch (error) {   //error reading header, close the socket with error
-                
-            }
-        }
-    })
+    //NOTE: data will arrive in 65536 byte chunks.
+    socket.on('data', (data) => socket.packet.data(data))
 
     //'close' event is emitted when the stream and any of its underlying resources (a file descriptor, for example) have been closed.
     socket.on('close', () => { console.log('socket closed') })
@@ -267,7 +254,40 @@ config.update.on('config/User/WebsocketPort', (port) => {
 /*
     function handleOP(fin, opcode, payload){
         //const { fin, opcode, payload } = extract(data)
-        
+        switch (packet.op) {
+                        case OPCODES.CONTINUATION:  //received partial data
+                            console.log('socket received partial packet')
+                            break
+                        
+                        case OPCODES.TEXT:          //received text data
+                            console.log('socket received text:')
+                            break
+                        
+                        case OPCODES.BINARY:        //received binary data
+                            console.log('socket received binary')
+                            break
+                    
+                        case OPCODES.CLOSE:         //received closing handshake from client
+                            //const code = payload.readUInt16BE(0) || 1005
+                            //const reason = payload.toString('utf8', 2) || ''
+                            console.log('socket received close handshake with code:reason')
+                            //socket.end()
+                            break
+
+                        case OPCODES.PING:          //received ping, send pong
+                            console.log('socket received ping')
+                            break
+
+                        case OPCODES.PONG:          //received pong, update alive status          
+                            console.log('socket received pong')
+                            break
+
+                        default:
+                            //TODO: spec mandates unknown opcodes must close the connection
+                            break
+                    }
+                }) 
+            }
     }
     */
 

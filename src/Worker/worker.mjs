@@ -19,7 +19,7 @@ function connectWS(args){
 
     var randomdata = []
     //const datacount = 65535
-    const datacount = 1024*1024*5
+    const datacount = Math.floor(Math.random() * 1024*1024*5)
     //4194303,99.
     //const datacount = 1024*4194303
     //const datacount = 4194302 / 2
@@ -28,13 +28,9 @@ function connectWS(args){
         randomdata.push(charray[Math.floor(Math.random() * charray.length)])
     }
 
-    setTimeout(() => {
-        try {
-            ws.send(randomdata.join(''))
-        } catch (error) {
-            console.error(error)
-        }
-    }, 2000)
+    setTimeout(() => ws.send(randomdata.join('')), 2000)
+    setTimeout(() => ws.send(randomdata.join('')), 4000)
+    setTimeout(() => ws.send(randomdata.join('')), 6000)
     setTimeout(() => ws.close(4111, 'abayo'), 20000)
 }
 
