@@ -29,8 +29,8 @@ function connectWS(args){
     }
 
     setTimeout(() => ws.send(randomdata.join('')), 2000)
-    setTimeout(() => ws.send(randomdata.join('')), 4000)
-    setTimeout(() => ws.send(randomdata.join('')), 6000)
+    //setTimeout(() => ws.send(randomdata.join('')), 4000)
+    //setTimeout(() => ws.send(randomdata.join('')), 6000)
     setTimeout(() => ws.close(4111, 'abayo'), 20000)
 }
 
