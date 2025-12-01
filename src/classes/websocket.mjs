@@ -19,20 +19,29 @@ export class websocketInterface{
         this.bufferIndex = 0
         this.timeout = null
         this.heartbeat = setInterval(() => {
-            if(Date.now() - this.timestamp > 10)
-            this.#control(OPCODES.PING, '')
-        }, 10000)
+            if(!this.buffering)this.#parse(OPCODES.PING)    //only send pings when not writing to buffer
+            if(Date.now() - this.timestamp > 10000){        //over 10 seconds since last update, kill connection
+                this.#error(1000, 'Connection timed out')
+            }    
+        }, 2000)
         this.apiMap = new Map()
         this.socket = socket
         this.timestamp = Date.now()
+        this.closeSent = false
+        this.code = 1000
+        this.reason = ''
 
         //Handle socket events. 
         socket.on('data', (c) => this.#data(c))
         //'close' event is emitted when the stream and any of its underlying resources (a file descriptor, for example) have been closed.
-        socket.on('close', () => { console.log('websocket.mjs class: socket close') })
+        socket.on('close', () => {
+            console.log('socket.close -> cleanup()')
+            this.#cleanup()
+        })
         //'end' event is emitted when there is no more data to be consumed from the stream.(basically upon disconnection)
         socket.on('end', () => {
-            console.log('websocket.mjs class: socket end')
+            console.log('socket.end -> closeConnection()')
+            if(!this.closeSent)this.#closeConnection(this.code, this.reason)
         })
         socket.on('error', (err) => { this.#error(1011, err) })
 
@@ -52,95 +61,90 @@ export class websocketInterface{
 
     #emit(api, ...args){ if(this.apiMap.has(api))this.apiMap?.get(api)(...args) }
 
-    #close(code, reason){
-        console.log(`closing socket with code: ${code} - reason: ${reason}`)
-        this.#emit('close', code, reason)
-        this.socket.end()
+    #cleanup(){
         clearInterval(this.heartbeat)
+        clearTimeout(this.timeout)
+        //this.socket.end()
+        this.socket.destroy()
+    }
+
+    #closeConnection(code, reason){
+        console.log('close connection called', code, reason)
+        //send closing handshake once
+        if(!this.closeSent){
+            this.code = this.code ? this.code : code
+            this.reason = this.reason ? this.reason : reason
+
+            const payload = Buffer.alloc(2 + reason.length)
+            payload.writeInt16BE(this.code)
+            for (let i = 0; i < this.reason.length; i++) { payload.writeUInt8(this.reason[i], i + 2) }
+
+            this.#parse(OPCODES.CLOSE, payload)
+            this.closeSent = true
+
+            this.timeout = setTimeout(() => { this.#cleanup() }, 1000)
+        }
     }
 
     #error(code, message){
-        if(this.apiMap.has('error'))this.apiMap.get('error')(message)
+        this.code = code
+        this.reason = message
+        if(this.apiMap.has('error'))this.apiMap.get('error')({error: message, code: code})
         //any error occurring in this class is severe enough to warrant client disconnection
-        this.#close(code, message)
+        //this.#closeConnection(code, message, '#error')
+        this.socket.end()
     }
 
     on(api, callback){ this.apiMap.set(api, callback) }
 
     off(api){ this.apiMap.delete(api) }
 
-    #parse(opcode, data){
+    #parse(opcode, data, isFinal = true){
+        if(this.closeSent)return     //no more data transmits after close frame has been sent
+
+        const databuf = Buffer.from(data || '')
+        const size = databuf.length
+
+        //determine frame byte size
+        const frameSize = size < 126 ? 2 + size : size < 127 ? 4 + size : 10 + size
+
+        const frame = Buffer.alloc(frameSize)
+        //frame[0] = opcode
+        const FIN = isFinal ? 0x80 : 0x00
+        frame[0] = FIN | opcode
+
+        switch (true) {
+            case (size <= 126):
+                frame[1] = size     //8-bit length, offset 2 bytes
+                databuf.copy(frame, 2)
+                break
+            case (size <= 65535):
+                frame[1] = 126      //16-bit length, offset 4 bytes
+                frame.writeUInt16BE(size, 2)
+                databuf.copy(frame, 4)
+                break
         
+            default:
+                frame[1] = 127      //64-bit length, offset 10 bytes
+                frame.writeUInt32BE(0, 2)
+                frame.writeUInt32BE(size, 6)
+                databuf.copy(frame, 10)
+                break
+        }
+        this.socket.write(frame)
     }
 
     send(data){
-        const databuf = Buffer.from(data)
-        const size = databuf.length
-
-        //determine frame byte size
-        const frameSize = size < 126 ? 2 + size : size < 127 ? 4 + size : 10 + size
-
-        const frame = Buffer.alloc(frameSize)
         //FIN + type of data is string ? textFrame : binaryFrame
-        frame[0] = typeof data === 'string' ? 0x81 : 0x82
-
-        switch (true) {
-            case (size <= 126):
-                frame[1] = size     //8-bit length, offset 2 bytes
-                databuf.copy(frame, 2)
-                break
-            case (size <= 65535):
-                frame[1] = 126      //16-bit length, offset 4 bytes
-                frame.writeUInt16BE(size, 2)
-                databuf.copy(frame, 4)
-                break
-        
-            default:
-                frame[1] = 127      //64-bit length, offset 10 bytes
-                frame.writeUInt32BE(0, 2)
-                frame.writeUInt32BE(size, 6)
-                databuf.copy(frame, 10)
-                break
-        }       
-        this.socket.write(frame)
-    }
-
-    #control(opcode, data){
-        const databuf = Buffer.from(data)
-        const size = databuf.length
-
-        //determine frame byte size
-        const frameSize = size < 126 ? 2 + size : size < 127 ? 4 + size : 10 + size
-
-        const frame = Buffer.alloc(frameSize)
-        //FIN + type of data is string ? textFrame : binaryFrame
-        frame[0] = opcode
-
-        switch (true) {
-            case (size <= 126):
-                frame[1] = size     //8-bit length, offset 2 bytes
-                databuf.copy(frame, 2)
-                break
-            case (size <= 65535):
-                frame[1] = 126      //16-bit length, offset 4 bytes
-                frame.writeUInt16BE(size, 2)
-                databuf.copy(frame, 4)
-                break
-        
-            default:
-                frame[1] = 127      //64-bit length, offset 10 bytes
-                frame.writeUInt32BE(0, 2)
-                frame.writeUInt32BE(size, 6)
-                databuf.copy(frame, 10)
-                break
-        }       
-        this.socket.write(frame)
+        const opcode = typeof data === 'string' ? OPCODES.TEXT : OPCODES.BINARY
+        this.#parse(opcode, data)
     }
 
     #received(){
         //create a copy of the packet before emitting it
         const buffercopy = Buffer.from(this.buffer)
         this.timestamp = Date.now()
+
         switch (this.opcode) {
             case OPCODES.CONTINUATION:  //received partial data
                 console.log('socket received partial packet')
@@ -156,13 +160,15 @@ export class websocketInterface{
                 this.#emit('message', buffercopy, true)
                 break
         
-            case OPCODES.CLOSE:         //received closing handshake from client  
-                this.#close(buffercopy.readUInt16BE(0) || 1005, buffercopy.toString('utf8', 2) || '')
+            case OPCODES.CLOSE:         //received closing handshake from client
+                const code = buffercopy.length > 1 ? buffercopy.readUInt16BE(0) : 1005
+                const reason = buffercopy.length > 2 ? buffercopy.toString('utf8', 2) : ''
+                this.#closeConnection(code, reason)
                 break
 
             case OPCODES.PING:          //received ping, send pong
                 console.log('socket received ping')
-                this.#control(OPCODES.PONG, buffercopy)
+                this.#parse(OPCODES.PONG, buffercopy)
                 break
 
             case OPCODES.PONG:          //received pong, update alive status          
@@ -175,6 +181,7 @@ export class websocketInterface{
                 this.#error(1002, 'Protocol error(opcode)')
                 break
         }
+        this.buffering = false
     }
 
     #write(data){
@@ -187,8 +194,8 @@ export class websocketInterface{
                 }
                 catch (error) {
                     this.#error(1011, 'Data write error')
-                    console.error(error)
-                    this.buffering = false
+                    //console.error(error)
+                    console.error('data:', data.length, ' - ', this.bufferIndex, '/', this.buffer.length)
                     break
                 }
             }
@@ -196,8 +203,6 @@ export class websocketInterface{
 
         //buffer has all the expected data, do callback
         if(this.bufferIndex === this.buffer.length){
-            clearTimeout(this.timeout)
-            this.buffering = false
             this.#received()
         }
     }
@@ -221,7 +226,6 @@ export class websocketInterface{
 
         if(!Object.values(OPCODES).includes(this.opcode)){
             this.#error(1002, 'Protocol error(opcode)')
-            this.buffering = false
             return
         }
 
@@ -232,7 +236,6 @@ export class websocketInterface{
         //if length is less than size, payload size was not read right(above 32bit integer range)
         if(length < size){
             this.#error(1009, 'Payload too large')
-            this.buffering = false
             return
         }
 
@@ -253,7 +256,7 @@ export class websocketInterface{
     }
 
     //NOTE: data will arrive in 65536 byte chunks.
-    #data(chunk){ this.buffer ? this.#write(chunk) : this.#newpacket(chunk) }
+    #data(chunk){ this.buffering ? this.#write(chunk) : this.#newpacket(chunk) }
 }
 
 /*

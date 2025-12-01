@@ -66,11 +66,16 @@ function createGUI(args){
             //ws.binaryType = "arraybuffer"
             ws.onopen = () => win.webContents.send('console', 'websocket open')
             
-            ws.addEventListener('message', (event) => {
-                const isBinary = typeof event.data !== 'string'
-                win.webContents.send('console', `isBinary:${isBinary}/message:${event.data}`)
+            ws.addEventListener('message', (e) => {
+                const isBinary = typeof e.data !== 'string'
+                win.webContents.send('console', `isBinary:${isBinary}/message:${e.data}`)
             })
-            setTimeout(() => ws.close(4111, 'abayo'), 20000)
+
+            ws.addEventListener('close', (e) => {
+                win.webContents.send('console', `connection closed ${e.code}, ${e.reason}`, )
+                setTimeout(() => { app.quit() }, 1000)
+            })
+            setTimeout(() => ws.close(), 5000)
         }, 4000);
     })
 }

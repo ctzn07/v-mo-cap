@@ -8,6 +8,17 @@ import { Buffer } from 'node:buffer'
 
 export const server = new EventEmitter()
 
+const stressTest = () => {
+    const charray = ['A', 'B', 'C'] 
+    const randomdata = []
+    const datacount = Math.floor(1024*1024*12)
+    for(var i = 0; i < datacount; ++i){
+        randomdata.push(charray[Math.floor(Math.random() * charray.length)])
+    }
+
+    return randomdata.join('')
+}
+
 const netserver = http.createServer({}, (req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' })
     res.end('V-Mo-Cap server.\n')
@@ -35,14 +46,14 @@ netserver.on('close', () => {
 })
 
 //https://nodejs.org/api/http.html#event-connect_1
-netserver.on('connect', (req, socket, head) => { console.log('server "connect" event') })
+netserver.on('connect', (req, socket, head) => { /*console.log('server "connection" event')*/ })
 
 //https://nodejs.org/api/http.html#event-connection
-netserver.on('connection', (socket) => { console.log('server "connection" event') })
+netserver.on('connection', (socket) => { /*console.log('server "connection" event')*/ })
 
-netserver.on('request', (req, res) => { console.log('server "request" event') })
+netserver.on('request', (req, res) => { /*console.log('server "request" event')*/ })
 
-netserver.on('dropRequest', (req, socket) => { console.log('server "dropRequest" event') })
+netserver.on('dropRequest', (req, socket) => { /*console.log('server "dropRequest" event')*/ })
 
 
 function getRouteInfo(req){
@@ -60,16 +71,7 @@ function authCheck(route, params){
     return true
 }
 
-const stressTest = () => {
-    const charray = ['A', 'B', 'C'] 
-    const randomdata = []
-    const datacount = Math.floor(1024*1024*12)
-    for(var i = 0; i < datacount; ++i){
-        randomdata.push(charray[Math.floor(Math.random() * charray.length)])
-    }
 
-    return randomdata.join('')
-}
 
 //https://nodejs.org/api/http.html#event-upgrade_1
 netserver.on('upgrade', (req, socket, head) => {
@@ -79,21 +81,17 @@ netserver.on('upgrade', (req, socket, head) => {
 
     if(!authCheck(route, params)){ return } //not authorized, let request timeout(should probably return proper unauth response)
 
-    //Create emitter to interact with socket
-    const ws = new EventEmitter()
-
     const websocket = new websocketInterface(socket)
 
-    websocket.on('error', (e) => console.error(e))
+    websocket.on('error', (e) => console.error('SOCKET ERROROROROOROROR ', e.code, e.message))
+    websocket.on('close', (code, reason) => {
+        console.log(`Client disconnected with code:${code}, reason:${reason}`)
+        server.emit('disconnect', websocket)
+    })
 
     //broadcast new socket to listeners
-    server.emit('connect', ws)
-
-    setTimeout(() => {
-        const asd = Buffer.from(stressTest())
-        console.log('sending:', typeof asd)
-        websocket.send(asd)
-    }, 3000);
+    server.emit('connect', websocket)
+    console.log(`New Websocket client with route:${route}, params:${JSON.stringify(params)}`)
 
     const key = req.headers['sec-websocket-key']
     const websocketkey = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
