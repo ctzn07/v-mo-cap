@@ -12,7 +12,7 @@ function quit(code){
 function getStressData(){
     const charray = ['A', 'B', 'C'] 
     const randomdata = []
-    const datacount = 256
+    const datacount = 14 * 1024 * 1024
     for(var i = 0; i < datacount; ++i){
         randomdata.push(charray[Math.floor(Math.random() * charray.length)])
     }

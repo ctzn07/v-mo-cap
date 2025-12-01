@@ -123,17 +123,14 @@ export class websocketInterface{
         
         switch (this.packet.opcode) {
             case OPCODES.CONTINUATION:  //received partial data
-                this.#closeConnection(1003, 'Server cannot handle partial packets')
+                this.#emit('partial', buffercopy)
                 break
                 
             case OPCODES.TEXT:          //received text data
-                console.log('received ', this.packet.buffer.length, 'bytes of text')
-                console.log(buffercopy.toString('utf8'))
                 this.#emit('message', buffercopy.toString('utf8'), false)
                 break
             
             case OPCODES.BINARY:        //received binary data
-                console.log('received ', buffercopy.length, 'bytes of binary')
                 this.#emit('message', buffercopy, true)
                 break
         
@@ -181,7 +178,7 @@ export class websocketInterface{
 
     #newpacket(data){
         this.packet = {}
-        
+
         //Extract the RSV1, RSV2, and RSV3 bits by shifting and masking
         this.packet.rsv = [(data[0] >> 7) & 1, (data[0] >> 6) & 1, (data[0] >> 5) & 1 ]  
         //this.packet.rsv[0]    // Bit 7 (highest bit)
