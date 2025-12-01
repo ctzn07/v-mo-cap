@@ -86,7 +86,7 @@ function createGUI(args){
                 win.webContents.send('console', `connection closed ${e.code}, ${e.reason}`, )
                 setTimeout(() => { app.quit() }, 1000)
             })
-            setTimeout(() => ws.close(), 50000)
+            setTimeout(() => ws.close(1000, 'smellya'), 10000)
         }, 4000);
     })
 }

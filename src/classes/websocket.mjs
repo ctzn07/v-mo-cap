@@ -180,17 +180,29 @@ export class websocketInterface{
     }
 
     #newpacket(data){
-        this.packet = {
-            rsv: [(data[0] >> 7) & 1, (data[0] >> 6) & 1, (data[0] >> 5) & 1 ], 
-            fin: (data[0] & 0x80) !== 0, 
-            opcode: data[0] & 0x0f, 
-            isMasked: (data[1] & 0x80) === 0x80, 
+        this.packet = {}
+        
+        //Extract the RSV1, RSV2, and RSV3 bits by shifting and masking
+        this.packet.rsv = [(data[0] >> 7) & 1, (data[0] >> 6) & 1, (data[0] >> 5) & 1 ]  
+        //this.packet.rsv[0]    // Bit 7 (highest bit)
+        //this.packet.rsv[1]    // Bit 6
+        //this.packet.rsv[2]    // Bit 5
+        //NOTE: even if RSV1 bit is enabled(perMessageDeflate), the extension data isn't included in the payload?
+        if(this.packet.rsv[1] || this.packet.rsv[1]){
+            this.#error(1002, 'Protocol error(RSV)')
+            return
         }
+
+        this.packet.fin = (data[0] & 0x80) !== 0
+        this.packet.opcode = data[0] & 0x0f
 
         if(!Object.values(OPCODES).includes(this.packet.opcode)){
             this.#error(1002, 'Protocol error(opcode)')
             return
         }
+
+        //this is bit pointless because all data client sends is masked
+        this.packet.isMasked = (data[1] & 0x80) === 0x80
 
         const bitSizeCheck = () => {
             const dataView = new DataView(data.buffer)
@@ -231,12 +243,9 @@ export class websocketInterface{
     #data(chunk){ this.packet ? this.#write(chunk) : this.#newpacket(chunk) }
 }
 
-        // Extract the RSV1, RSV2, and RSV3 bits by shifting and masking
-        //this.packet.rsv[0] =   // Bit 7 (highest bit)
-        //this.packet.rsv[1] =   // Bit 6
-        //this.packet.rsv[2] =  // Bit 5
-        //NOTE: even if RSV1 bit is enabled(perMessageDeflate), the extension data isn't included in the payload
-        //TODO: reject packets with RSV2 & 3, as this is not spec compliant server
+        
+        
+        
 
 /*
 CODES
