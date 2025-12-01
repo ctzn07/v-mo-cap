@@ -83,7 +83,7 @@ netserver.on('upgrade', (req, socket, head) => {
 
     const websocket = new websocketInterface(socket)
 
-    websocket.on('error', (e) => console.error('SOCKET ERROROROROOROROR ', e.code, e.message))
+    websocket.on('error', (e) => console.error('SOCKET ERROROROROOROROR ', e))
     websocket.on('close', (code, reason) => {
         console.log(`Client disconnected with code:${code}, reason:${reason}`)
         server.emit('disconnect', websocket)

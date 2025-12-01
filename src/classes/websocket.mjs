@@ -7,9 +7,25 @@ const OPCODES = {
     PONG:         0x0A
 }
 
+const STATUS = {
+    OPEN: 1,
+    CLOSING: 2,
+    CLOSED: 3,
+}
+
 export class websocketInterface{
     constructor(socket){
+        this.socket = socket
         this.buffering = false
+        this.packet = {
+            rsv: [], 
+            fin: null, 
+            opcode: null, 
+            isMasked: null, 
+            maskingKey: null, 
+            buffer: null, 
+            bufferIndex: 0, 
+        }
         this.rsv = []
         this.fin = null
         this.opcode = null
@@ -18,33 +34,27 @@ export class websocketInterface{
         this.buffer = null
         this.bufferIndex = 0
         this.timeout = null
-        this.heartbeat = setInterval(() => {
-            if(!this.buffering)this.#parse(OPCODES.PING)    //only send pings when not writing to buffer
-            if(Date.now() - this.timestamp > 10000){        //over 10 seconds since last update, kill connection
-                this.#error(1000, 'Connection timed out')
-            }    
-        }, 2000)
+        this.heartbeat = this.#heartbeat()
         this.apiMap = new Map()
-        this.socket = socket
         this.timestamp = Date.now()
-        this.closeSent = false
-        this.code = 1000
-        this.reason = ''
+        this.status = STATUS.OPEN
 
         //Handle socket events. 
         socket.on('data', (c) => this.#data(c))
         //'close' event is emitted when the stream and any of its underlying resources (a file descriptor, for example) have been closed.
-        socket.on('close', () => {
-            console.log('socket.close -> cleanup()')
-            this.#cleanup()
-        })
+        socket.on('close', () => { this.#cleanup() })
         //'end' event is emitted when there is no more data to be consumed from the stream.(basically upon disconnection)
-        socket.on('end', () => {
-            console.log('socket.end -> closeConnection()')
-            if(!this.closeSent)this.#closeConnection(this.code, this.reason)
-        })
+        socket.on('end', () => { if(this.status === STATUS.OPEN)this.#closeConnection() })
         socket.on('error', (err) => { this.#error(1011, err) })
 
+    }
+
+    #heartbeat(){
+        return setInterval(() => {
+            //over 10 seconds since last update, kill connection
+            if(Date.now() - this.timestamp > 10000){ this.#error(1000, 'Connection timed out') }
+            this.#parse(OPCODES.PING)
+        }, 2000)
     }
 
     #bitSizeCheck(data){
@@ -64,35 +74,31 @@ export class websocketInterface{
     #cleanup(){
         clearInterval(this.heartbeat)
         clearTimeout(this.timeout)
-        //this.socket.end()
+        this.status = STATUS.CLOSED
         this.socket.destroy()
     }
 
-    #closeConnection(code, reason){
+    #closeConnection(code = 1005, reason = ''){
         console.log('close connection called', code, reason)
         //send closing handshake once
-        if(!this.closeSent){
-            this.code = this.code ? this.code : code
-            this.reason = this.reason ? this.reason : reason
-
+        if(this.status === STATUS.OPEN){
             const payload = Buffer.alloc(2 + reason.length)
-            payload.writeInt16BE(this.code)
-            for (let i = 0; i < this.reason.length; i++) { payload.writeUInt8(this.reason[i], i + 2) }
+            payload.writeInt16BE(code)
+            for (let i = 0; i < reason.length; i++) { payload.writeUInt8(reason[i], i + 2) }
 
             this.#parse(OPCODES.CLOSE, payload)
-            this.closeSent = true
+            this.status = STATUS.CLOSING
 
-            this.timeout = setTimeout(() => { this.#cleanup() }, 1000)
+            this.socket.end()
+            //this.timeout = setTimeout(() => { this.#cleanup() }, 1000)
         }
     }
 
     #error(code, message){
-        this.code = code
-        this.reason = message
-        if(this.apiMap.has('error'))this.apiMap.get('error')({error: message, code: code})
+        if(this.apiMap.has('error'))this.apiMap.get('error')(message)
         //any error occurring in this class is severe enough to warrant client disconnection
         //this.#closeConnection(code, message, '#error')
-        this.socket.end()
+        this.#closeConnection(code, reason)
     }
 
     on(api, callback){ this.apiMap.set(api, callback) }
@@ -100,7 +106,7 @@ export class websocketInterface{
     off(api){ this.apiMap.delete(api) }
 
     #parse(opcode, data, isFinal = true){
-        if(this.closeSent)return     //no more data transmits after close frame has been sent
+        if(this.status !== STATUS.OPEN)return     //no more data transmits after close frame has been sent
 
         const databuf = Buffer.from(data || '')
         const size = databuf.length
@@ -147,16 +153,14 @@ export class websocketInterface{
 
         switch (this.opcode) {
             case OPCODES.CONTINUATION:  //received partial data
-                console.log('socket received partial packet')
+                this.#closeConnection(1003, 'Server cannot handle partial packets')
                 break
                 
             case OPCODES.TEXT:          //received text data
-                console.log('socket received text:')
                 this.#emit('message', buffercopy.toString('utf8'), false)
                 break
             
             case OPCODES.BINARY:        //received binary data
-                console.log('socket received binary')
                 this.#emit('message', buffercopy, true)
                 break
         
@@ -167,12 +171,10 @@ export class websocketInterface{
                 break
 
             case OPCODES.PING:          //received ping, send pong
-                console.log('socket received ping')
                 this.#parse(OPCODES.PONG, buffercopy)
                 break
 
             case OPCODES.PONG:          //received pong, update alive status          
-                console.log('socket received pong')
                 //no action required, any incoming packet will refresh the timestamp
                 break
 
