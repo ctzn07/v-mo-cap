@@ -123,7 +123,7 @@ export class websocketInterface{
         
         switch (this.packet.opcode) {
             case OPCODES.CONTINUATION:  //received partial data
-                this.#emit('partial', buffercopy)
+                this.#emit('partial', buffercopy, this.packet.fin)
                 break
                 
             case OPCODES.TEXT:          //received text data
