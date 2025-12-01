@@ -17,23 +17,7 @@ export class websocketInterface{
     constructor(socket){
         this.socket = socket
         this.buffering = false
-        this.packet = {
-            rsv: [], 
-            fin: null, 
-            opcode: null, 
-            isMasked: null, 
-            maskingKey: null, 
-            buffer: null, 
-            bufferIndex: 0, 
-        }
-        this.rsv = []
-        this.fin = null
-        this.opcode = null
-        this.isMasked = null
-        this.maskingKey = null
-        this.buffer = null
-        this.bufferIndex = 0
-        this.timeout = null
+        this.packet = null
         this.heartbeat = this.#heartbeat()
         this.apiMap = new Map()
         this.timestamp = Date.now()
@@ -57,23 +41,10 @@ export class websocketInterface{
         }, 2000)
     }
 
-    #bitSizeCheck(data){
-        const dataView = new DataView(data.buffer)
-        const high = dataView.getUint32(2)  // Read the first 4 bytes (high part)
-        const low = dataView.getUint32(6)  // Read the next 4 bytes (low part)
-
-        // Combine high and low parts to form the full 64-bit length
-        const fullLength = (BigInt(high) << 32n) | BigInt(low)
-
-        // Return 0 if the lenght exceeds the 32-bit range, otherwise return 32-bit value
-        return (fullLength > 0xFFFFFFFFn) ? 0 : Number(fullLength & 0xFFFFFFFFn)
-    }
-
     #emit(api, ...args){ if(this.apiMap.has(api))this.apiMap?.get(api)(...args) }
 
     #cleanup(){
         clearInterval(this.heartbeat)
-        clearTimeout(this.timeout)
         this.status = STATUS.CLOSED
         this.socket.destroy()
     }
@@ -90,7 +61,6 @@ export class websocketInterface{
             this.status = STATUS.CLOSING
 
             this.socket.end()
-            //this.timeout = setTimeout(() => { this.#cleanup() }, 1000)
         }
     }
 
@@ -98,7 +68,7 @@ export class websocketInterface{
         if(this.apiMap.has('error'))this.apiMap.get('error')(message)
         //any error occurring in this class is severe enough to warrant client disconnection
         //this.#closeConnection(code, message, '#error')
-        this.#closeConnection(code, reason)
+        this.#closeConnection(code, message)
     }
 
     on(api, callback){ this.apiMap.set(api, callback) }
@@ -148,19 +118,22 @@ export class websocketInterface{
 
     #received(){
         //create a copy of the packet before emitting it
-        const buffercopy = Buffer.from(this.buffer)
+        const buffercopy = Buffer.from(this.packet.buffer)
         this.timestamp = Date.now()
-
-        switch (this.opcode) {
+        
+        switch (this.packet.opcode) {
             case OPCODES.CONTINUATION:  //received partial data
                 this.#closeConnection(1003, 'Server cannot handle partial packets')
                 break
                 
             case OPCODES.TEXT:          //received text data
+                console.log('received ', this.packet.buffer.length, 'bytes of text')
+                console.log(buffercopy.toString('utf8'))
                 this.#emit('message', buffercopy.toString('utf8'), false)
                 break
             
             case OPCODES.BINARY:        //received binary data
+                console.log('received ', buffercopy.length, 'bytes of binary')
                 this.#emit('message', buffercopy, true)
                 break
         
@@ -183,57 +156,57 @@ export class websocketInterface{
                 this.#error(1002, 'Protocol error(opcode)')
                 break
         }
-        this.buffering = false
+        
+        delete this.packet
     }
 
     #write(data){
-        if(this.isMasked && this.maskingKey){
+        if(this.packet.isMasked && this.packet.maskingKey){
             //unmask data to buffer
             for (let i = 0; i < data.length; i++){
                 try {
-                    this.buffer.writeUInt8(data[i] ^ this.maskingKey[this.bufferIndex % 4], this.bufferIndex)
-                    this.bufferIndex++
+                    this.packet.buffer.writeUInt8(data[i] ^ this.packet.maskingKey[this.packet.bufferIndex % 4], this.packet.bufferIndex)
+                    this.packet.bufferIndex++
                 }
                 catch (error) {
-                    this.#error(1011, 'Data write error')
-                    //console.error(error)
-                    console.error('data:', data.length, ' - ', this.bufferIndex, '/', this.buffer.length)
+                    this.#error(1011, `Buffer write error(${data.length}->${this.packet.bufferIndex}/${this.packet.buffer.length})`)
                     break
                 }
             }
         }
 
         //buffer has all the expected data, do callback
-        if(this.bufferIndex === this.buffer.length){
-            this.#received()
-        }
+        if(this.packet.bufferIndex === this.packet.buffer.length){ this.#received() }
     }
 
     #newpacket(data){
-        this.buffering = true
-        // Extract the RSV1, RSV2, and RSV3 bits by shifting and masking
-        this.rsv.length = 0
-        this.rsv[0] = (data[0] >> 7) & 1  // Bit 7 (highest bit)
-        this.rsv[1] = (data[0] >> 6) & 1  // Bit 6
-        this.rsv[2] = (data[0] >> 5) & 1  // Bit 5
-        //NOTE: even if RSV1 bit is enabled(perMessageDeflate), the extension data isn't included in the payload
-        //TODO: reject packets with RSV2 & 3, as this is not spec compliant server
+        this.packet = {
+            rsv: [(data[0] >> 7) & 1, (data[0] >> 6) & 1, (data[0] >> 5) & 1 ], 
+            fin: (data[0] & 0x80) !== 0, 
+            opcode: data[0] & 0x0f, 
+            isMasked: (data[1] & 0x80) === 0x80, 
+        }
 
-        this.fin = null
-        this.fin = (data[0] & 0x80) !== 0
-        this.opcode = null
-        this.opcode = data[0] & 0x0f
-        this.isMasked = null
-        this.isMasked = (data[1] & 0x80) === 0x80
-
-        if(!Object.values(OPCODES).includes(this.opcode)){
+        if(!Object.values(OPCODES).includes(this.packet.opcode)){
             this.#error(1002, 'Protocol error(opcode)')
             return
         }
 
+        const bitSizeCheck = () => {
+            const dataView = new DataView(data.buffer)
+            const high = dataView.getUint32(2)  // Read the first 4 bytes (high part)
+            const low = dataView.getUint32(6)  // Read the next 4 bytes (low part)
+
+            // Combine high and low parts to form the full 64-bit length
+            const fullLength = (BigInt(high) << 32n) | BigInt(low)
+
+            // Return 0 if the lenght exceeds the 32-bit range, otherwise return 32-bit value
+            return (fullLength > 0xFFFFFFFFn) ? 0 : Number(fullLength & 0xFFFFFFFFn)
+        }
+
         //read data size
         const size = data[1] & 0x7f
-        const length = size < 126 ? size : size === 126 ? data.readUInt16BE(2) : this.#bitSizeCheck(data)
+        const length = size < 126 ? size : size === 126 ? data.readUInt16BE(2) : bitSizeCheck()
 
         //if length is less than size, payload size was not read right(above 32bit integer range)
         if(length < size){
@@ -243,14 +216,11 @@ export class websocketInterface{
 
         //determine masking key starting index
         const keyByteIndex = size < 126 ? 2 : size < 127 ? 4 : 10
-        this.maskingKey = null
-        this.maskingKey = data.slice(keyByteIndex, keyByteIndex + 4)
+        this.packet.maskingKey = data.slice(keyByteIndex, keyByteIndex + 4)
 
-        //reset & allocate buffer
-        this.bufferIndex = 0
-        this.buffer = null
         //TODO: double-check which allocation method should be used https://nodejs.org/api/buffer.html#class-buffer
-        this.buffer = Buffer.alloc(length)
+        this.packet.buffer = Buffer.alloc(length)
+        this.packet.bufferIndex = 0
 
         //start reading payload after masking key
         //keyByteIndex + length of the masking key(4bytes)
@@ -258,8 +228,15 @@ export class websocketInterface{
     }
 
     //NOTE: data will arrive in 65536 byte chunks.
-    #data(chunk){ this.buffering ? this.#write(chunk) : this.#newpacket(chunk) }
+    #data(chunk){ this.packet ? this.#write(chunk) : this.#newpacket(chunk) }
 }
+
+        // Extract the RSV1, RSV2, and RSV3 bits by shifting and masking
+        //this.packet.rsv[0] =   // Bit 7 (highest bit)
+        //this.packet.rsv[1] =   // Bit 6
+        //this.packet.rsv[2] =  // Bit 5
+        //NOTE: even if RSV1 bit is enabled(perMessageDeflate), the extension data isn't included in the payload
+        //TODO: reject packets with RSV2 & 3, as this is not spec compliant server
 
 /*
 CODES

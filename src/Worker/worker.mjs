@@ -9,6 +9,16 @@ function quit(code){
     app.exit(code)
 }
 
+function getStressData(){
+    const charray = ['A', 'B', 'C'] 
+    const randomdata = []
+    const datacount = 256
+    for(var i = 0; i < datacount; ++i){
+        randomdata.push(charray[Math.floor(Math.random() * charray.length)])
+    }
+    return randomdata
+}
+
 function connectWS(args){
     //connect to main process using websocket(wss is not supported)
     //const ws = new WebSocket(`ws://localhost:${args.port}/worker?token=${args.token}`, {perMessageDeflate: false})
@@ -16,12 +26,7 @@ function connectWS(args){
 
     //var charray = ['A', 'B', 'C', 'D', 'E', 'F', 'G'] 
     
-    const charray = ['A', 'B'] 
-    const randomdata = []
-    const datacount = Math.floor(Math.random() * 1024*1024*5)
-    for(var i = 0; i < datacount; ++i){
-        randomdata.push(charray[Math.floor(Math.random() * charray.length)])
-    }
+    
     
     //setTimeout(() => ws.send(randomdata.join('')), 2000)
     //setTimeout(() => ws.send(randomdata.join('')), 4000)
@@ -70,12 +75,18 @@ function createGUI(args){
                 const isBinary = typeof e.data !== 'string'
                 win.webContents.send('console', `isBinary:${isBinary}/message:${e.data}`)
             })
+            const string = getStressData().join()
+
+            setTimeout(() => {
+                ws.send(string)
+                win.webContents.send('console', string)
+            }, 1000)
 
             ws.addEventListener('close', (e) => {
                 win.webContents.send('console', `connection closed ${e.code}, ${e.reason}`, )
                 setTimeout(() => { app.quit() }, 1000)
             })
-            setTimeout(() => ws.close(), 5000)
+            setTimeout(() => ws.close(), 50000)
         }, 4000);
     })
 }

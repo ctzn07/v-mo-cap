@@ -71,8 +71,6 @@ function authCheck(route, params){
     return true
 }
 
-
-
 //https://nodejs.org/api/http.html#event-upgrade_1
 netserver.on('upgrade', (req, socket, head) => {
     //get necessary info from update request
