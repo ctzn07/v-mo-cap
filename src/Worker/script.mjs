@@ -1,6 +1,8 @@
 //worker front-end script
 import * as Tasks from '@mediapipe/tasks-vision'
 
+api.subscribe('console', (e, message) => console.log(message))
+
 //Create video element
 const video = document.createElement('video')
 video.autoplay = true

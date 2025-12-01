@@ -12,26 +12,21 @@ function quit(code){
 function connectWS(args){
     //connect to main process using websocket(wss is not supported)
     //const ws = new WebSocket(`ws://localhost:${args.port}/worker?token=${args.token}`, {perMessageDeflate: false})
-    const ws = new WebSocket(`ws://localhost:${args.port}/worker?token=${args.token}`, {perMessageDeflate: false})
+    
 
     //var charray = ['A', 'B', 'C', 'D', 'E', 'F', 'G'] 
-    var charray = ['A', 'B'] 
-
-    var randomdata = []
-    //const datacount = 65535
+    
+    const charray = ['A', 'B'] 
+    const randomdata = []
     const datacount = Math.floor(Math.random() * 1024*1024*5)
-    //4194303,99.
-    //const datacount = 1024*4194303
-    //const datacount = 4194302 / 2
-
     for(var i = 0; i < datacount; ++i){
         randomdata.push(charray[Math.floor(Math.random() * charray.length)])
     }
-
-    setTimeout(() => ws.send(randomdata.join('')), 2000)
+    
+    //setTimeout(() => ws.send(randomdata.join('')), 2000)
     //setTimeout(() => ws.send(randomdata.join('')), 4000)
     //setTimeout(() => ws.send(randomdata.join('')), 6000)
-    setTimeout(() => ws.close(4111, 'abayo'), 20000)
+    //setTimeout(() => ws.close(4111, 'abayo'), 20000)
 }
 
 /*
@@ -65,7 +60,19 @@ function createGUI(args){
     if(isDev()){ win.webContents.openDevTools() }
 
     //page has finished loading
-    win.webContents.on('did-finish-load', () => {})
+    win.webContents.on('did-finish-load', () => {
+        setTimeout(() => {
+            const ws = new WebSocket(`ws://localhost:${args.port}/worker?token=${args.token}`, {perMessageDeflate: false, })
+            //ws.binaryType = "arraybuffer"
+            ws.onopen = () => win.webContents.send('console', 'websocket open')
+            
+            ws.addEventListener('message', (event) => {
+                const isBinary = typeof event.data !== 'string'
+                win.webContents.send('console', `isBinary:${isBinary}/message:${event.data}`)
+            })
+            setTimeout(() => ws.close(4111, 'abayo'), 20000)
+        }, 4000);
+    })
 }
 
 export default function initWorker(args){

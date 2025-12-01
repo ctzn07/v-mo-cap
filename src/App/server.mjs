@@ -45,8 +45,6 @@ netserver.on('request', (req, res) => { console.log('server "request" event') })
 netserver.on('dropRequest', (req, socket) => { console.log('server "dropRequest" event') })
 
 
-
-
 function getRouteInfo(req){
     const url = new URL('ws://' + server.address() + req.url)
     const route = url.pathname.split('/').filter(a => a).join('/')
@@ -60,6 +58,17 @@ function authCheck(route, params){
     //TODO: add way to register valid tokens for worker route
     //TODO: also set up route registration/authentication for plugins later
     return true
+}
+
+const stressTest = () => {
+    const charray = ['A', 'B', 'C'] 
+    const randomdata = []
+    const datacount = Math.floor(1024*1024*12)
+    for(var i = 0; i < datacount; ++i){
+        randomdata.push(charray[Math.floor(Math.random() * charray.length)])
+    }
+
+    return randomdata.join('')
 }
 
 //https://nodejs.org/api/http.html#event-upgrade_1
@@ -79,6 +88,12 @@ netserver.on('upgrade', (req, socket, head) => {
 
     //broadcast new socket to listeners
     server.emit('connect', ws)
+
+    setTimeout(() => {
+        const asd = Buffer.from(stressTest())
+        console.log('sending:', typeof asd)
+        websocket.send(asd)
+    }, 3000);
 
     const key = req.headers['sec-websocket-key']
     const websocketkey = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
