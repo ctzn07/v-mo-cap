@@ -199,7 +199,7 @@ export class websocketInterface{
         //this.packet.rsv[1]    // Bit 6
         //this.packet.rsv[2]    // Bit 5
         //NOTE: even if RSV1 bit is enabled(perMessageDeflate), the extension data isn't included in the payload?
-        if(this.packet.rsv[1] || this.packet.rsv[1]){
+        if(this.packet.rsv[1] || this.packet.rsv[2]){
             this.#error(1002, 'Protocol error(RSV)')
             return
         }
