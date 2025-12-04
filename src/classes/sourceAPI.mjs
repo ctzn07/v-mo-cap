@@ -1,0 +1,101 @@
+//Class for Server and Client to register API endpoints over websocket
+export class sourceAPI {
+    constructor(websocket) {
+        this.ws = websocket
+        this.buffer = new Map()
+        this.apiMap = new Map()
+        //set defaults in case parent does not define closure or error
+        this.apiMap.set('close', (code, reason) => console.log(code, reason))
+        this.apiMap.set('error', (e) => console.log(e))
+
+        this.ws.on('message', (data, isBinary) => this.#receive(data, isBinary))
+        this.ws.on('close', (code, reason) => this.apiMap.get('close')(code, reason) )
+        this.ws.on('error', (e) => this.apiMap.get('error')(e) )
+    }
+    
+    on(api, callback){ this.apiMap.set(api, callback) }
+
+    off(api){ this.apiMap.delete(api) }
+
+    #decodeData(arr){ return arr.map(n => String.fromCharCode(n)).join('') }
+    
+    #handleRequest(packet){
+        const response = {
+            id: packet.id,  
+            isRequest: false, 
+            api: packet.api, 
+        }
+
+        //check if api endpoint is registered, fill in the data
+        if(this.apiMap.has(packet.api)){
+            const res = this.apiMap.get(packet.api)(packet.data)
+            if(res instanceof Error){
+                //if API call return value is instance of Error, this will trigger
+                //.catch response in requesting end
+                response.error = res.message
+            } 
+            else{
+                //no errors, fill in the data to response(undefined if api entry has no return value)
+                response.data = res
+            }
+        }
+        //api is not registered, return error
+        else{ response.error = `${packet.api} is not registered with endpoint` }
+        //try sending response
+        try { this.ws.send(JSON.stringify(response)) }
+        catch(e) { this.apiMap.get('error')(e) }
+    }
+    
+    #receive(payload, isBinary){
+        const packet = {}
+
+        try{    //Attempt to parse the incoming data
+            if(isBinary){ Object.assign(packet, JSON.parse(this.#decodeData(payload))) }
+            else{ Object.assign(packet, JSON.parse(payload)) }
+
+            if(packet.isRequest){ this.#handleRequest(packet) }
+            else{ this.buffer.get(packet.id)(packet) }
+        }
+        catch(e){   //data parsing failed
+            packet.error = e
+        }
+    }
+    
+    request(api_path, o_data = null, timeout = 3000){   
+        return new Promise((resolve, reject) => {
+            //create unique request id
+            const requestId = crypto.randomUUID().split('-').at(-1)
+
+            //set listener to expire
+            const timer = setTimeout(() => {
+                reject('Request timed out')
+                this.buffer.delete(requestId)
+            }, timeout)
+
+            //construct listener
+            this.buffer.set(requestId, (packet) => {
+                clearTimeout(timer)
+                if(packet.error){ reject(packet.error) }
+                else{ resolve(packet.data) }
+                this.buffer.delete(requestId)
+            })
+
+            //packet template
+            const packet = {
+                id: requestId, 
+                isRequest: true, 
+                api: api_path, 
+                data: o_data
+            }
+
+            //stringify and send packet
+            try { this.ws.send(JSON.stringify(packet)) }
+            catch(e) {
+                clearTimeout(timer)
+                this.buffer.delete(requestId)
+                //setTimeout(() => { reject(e) }, 100)
+                process.nextTick(() => reject(e))
+            }
+        })
+    }
+}

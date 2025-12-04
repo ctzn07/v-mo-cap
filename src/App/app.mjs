@@ -5,9 +5,9 @@ import { console } from '../common/logger.mjs'
 import { config } from '../common/config.mjs'
 import { gui } from './gui.mjs'
 import { server } from './server.mjs'
-import { wsmanager } from './wsmanager.mjs'
+import { sourceManager } from './sources.mjs'
 
-import { isDev, platform } from '../common/util.mjs'
+import { isDev, platform, shortID } from '../common/util.mjs'
 
 import path from 'path'
 
@@ -85,6 +85,7 @@ function createGUI(){
     ipcMain.on('setconfig', (e, path, value) => config.set(path, value))
     ipcMain.on('update', (e, channel) => updateUI(channel)) //generic UI update request
     
+    ipcMain.on('addSource', (e, path) => config.set(path, shortID()))
     ipcMain.on('devicelist', (e, list) => manageDevices(list))
 
     //Data requests events from UI
@@ -96,7 +97,8 @@ function createGUI(){
 
     //Server events
     server.on('connect', (ws) => {
-         //client connected->create wsinterface for workers, figure out others later
+         //client connected->create sourceAPI for source manager
+         
          //console.log('app.mjs: new client connection')
     })
     server.on('disconnect', (ws) => {

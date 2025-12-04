@@ -11,7 +11,7 @@ await esbuild.build({
         './src/App/app.jsx', 
         './src/Worker/script.mjs', 
         './src/app.html', 
-        './src/worker.html', 
+        './src/source.html', 
         './src/css/global.css'
     ], 
     bundle: true, 

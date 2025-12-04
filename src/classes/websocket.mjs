@@ -13,6 +13,14 @@ const STATUS = {
     CLOSED: 3,
 }
 
+/*
+Emitted Events:
+('close', code, reason)
+('partial', data, fin)
+('message', data, isBinary)
+('error', code, reason)
+*/
+
 export class websocketInterface{
     constructor(socket){
         this.socket = socket
@@ -29,6 +37,7 @@ export class websocketInterface{
         socket.on('close', () => { this.#cleanup() })
         //'end' event is emitted when there is no more data to be consumed from the stream.(basically upon disconnection)
         socket.on('end', () => { if(this.status === STATUS.OPEN)this.#closeConnection() })
+        socket.on('timeout', () => { this.#error(1000, 'Connection timed out') })
         socket.on('error', (err) => { this.#error(1011, err) })
 
     }
@@ -47,12 +56,14 @@ export class websocketInterface{
         clearInterval(this.heartbeat)
         this.status = STATUS.CLOSED
         this.socket.destroy()
+        //finally, flag everything for garbage collector
+        for(const o of Object.keys(this)){ delete this[o] }
     }
 
     #closeConnection(code = 1005, reason = ''){
-        console.log('close connection called', code, reason)
         //send closing handshake once
         if(this.status === STATUS.OPEN){
+            this.#emit('close', code, reason)
             const payload = Buffer.alloc(2 + reason.length)
             payload.writeInt16BE(code)
             for (let i = 0; i < reason.length; i++) { payload.writeUInt8(reason[i], i + 2) }
@@ -67,13 +78,15 @@ export class websocketInterface{
     #error(code, message){
         if(this.apiMap.has('error'))this.apiMap.get('error')(message)
         //any error occurring in this class is severe enough to warrant client disconnection
-        //this.#closeConnection(code, message, '#error')
+        this.#emit('error', code, message)
         this.#closeConnection(code, message)
     }
 
     on(api, callback){ this.apiMap.set(api, callback) }
 
     off(api){ this.apiMap.delete(api) }
+
+    close(code = 1000, reason = ''){ this.#closeConnection(code, reason) }
 
     #parse(opcode, data, isFinal = true){
         if(this.status !== STATUS.OPEN)return     //no more data transmits after close frame has been sent
@@ -119,11 +132,12 @@ export class websocketInterface{
     #received(){
         //create a copy of the packet before emitting it
         const buffercopy = Buffer.from(this.packet.buffer)
+        const fin = this.packet.fin
         this.timestamp = Date.now()
         
         switch (this.packet.opcode) {
             case OPCODES.CONTINUATION:  //received partial data
-                this.#emit('partial', buffercopy, this.packet.fin)
+                this.#emit('partial', buffercopy, fin)
                 break
                 
             case OPCODES.TEXT:          //received text data

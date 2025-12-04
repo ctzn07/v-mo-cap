@@ -4,25 +4,28 @@ import EventEmitter from 'node:events'
 import { console } from '../common/logger.mjs'
 import { config } from '../common/config.mjs'
 import { websocketInterface } from '../classes/websocket.mjs'
-import { Buffer } from 'node:buffer'
 
 export const server = new EventEmitter()
-
-const stressTest = () => {
-    const charray = ['A', 'B', 'C'] 
-    const randomdata = []
-    const datacount = Math.floor(1024*1024*12)
-    for(var i = 0; i < datacount; ++i){
-        randomdata.push(charray[Math.floor(Math.random() * charray.length)])
-    }
-
-    return randomdata.join('')
-}
 
 const netserver = http.createServer({}, (req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' })
     res.end('V-Mo-Cap server.\n')
 })
+
+function getRouteInfo(req){
+    const url = new URL('ws://' + server.address() + req.url)
+    const route = url.pathname.split('/').filter(a => a).join('/')
+    const params = {}
+    //extract all search params to object
+    for (const [key, value] of url.searchParams) { params[key] = value }
+    return { route, params }
+}
+
+function authCheck(route, params){
+    //TODO: add way to register valid tokens for worker route
+    //TODO: also set up route registration/authentication for plugins later
+    return true
+}
 
 server.address = () => {
     if(!netserver.listening)return null
@@ -49,27 +52,30 @@ netserver.on('close', () => {
 netserver.on('connect', (req, socket, head) => { /*console.log('server "connection" event')*/ })
 
 //https://nodejs.org/api/http.html#event-connection
-netserver.on('connection', (socket) => { /*console.log('server "connection" event')*/ })
+netserver.on('connection', (socket) => {
+    const websocket = new websocketInterface(socket)
+    /*
+    Events:
+    ('close', code, reason)
+    ('partial', data, fin)
+    ('message', data, isBinary)
+    ('error', code, reason)
+    Methods:
+    send(data)          //data will be sent as text if typeof data === 'string', binary otherwise
+    on(event, callback) //register event callback
+    off(event)          //remove event callback
+    close(code, reason) //close connection, arguments are optional
+    */
+   //broadcast new socket to listeners
+    server.emit('connect', websocket)
+    websocket.on('partial', (data, fin) => websocket.close(1002, 'Server does not support fragmented data'))
+    websocket.on('close', (code, reason) => { server.emit('disconnect', websocket, code, reason) })
+    websocket.on('error', (code, reason) => console.error(`netserver websocket error(${code}) - ${reason}`))
+})
 
 netserver.on('request', (req, res) => { /*console.log('server "request" event')*/ })
 
 netserver.on('dropRequest', (req, socket) => { /*console.log('server "dropRequest" event')*/ })
-
-
-function getRouteInfo(req){
-    const url = new URL('ws://' + server.address() + req.url)
-    const route = url.pathname.split('/').filter(a => a).join('/')
-    const params = {}
-    //extract all search params to object
-    for (const [key, value] of url.searchParams) { params[key] = value }
-    return { route, params }
-}
-
-function authCheck(route, params){
-    //TODO: add way to register valid tokens for worker route
-    //TODO: also set up route registration/authentication for plugins later
-    return true
-}
 
 //https://nodejs.org/api/http.html#event-upgrade_1
 netserver.on('upgrade', (req, socket, head) => {
@@ -78,17 +84,7 @@ netserver.on('upgrade', (req, socket, head) => {
     //console.log(JSON.stringify(params, null, 4))
 
     if(!authCheck(route, params)){ return } //not authorized, let request timeout(should probably return proper unauth response)
-
-    const websocket = new websocketInterface(socket)
-
-    websocket.on('error', (e) => console.error('SOCKET ERROROROROOROROR ', e))
-    websocket.on('close', (code, reason) => {
-        console.log(`Client disconnected with code:${code}, reason:${reason}`)
-        server.emit('disconnect', websocket)
-    })
-
-    //broadcast new socket to listeners
-    server.emit('connect', websocket)
+    
     console.log(`New Websocket client with route:${route}, params:${JSON.stringify(params)}`)
 
     const key = req.headers['sec-websocket-key']
@@ -127,42 +123,6 @@ config.update.on('config/User/WebsocketPort', (port) => {
 //1001	Going Away
 //1006	Abnormal Closure
 //1012	Service Restart
-
-/**
-function extract(buffer) {
-    // --- Header ---
-    const fin = (buffer[0] & 0x80) !== 0
-    const opcode = buffer[0] & 0x0f
-    const isMasked = (buffer[1] & 0x80) === 0x80
-    const size = buffer[1] & 0x7f
-    // --- Payload Length ---
-
-    //const payloadLength = size < 126 ? size : size === 126 ? buffer.readUInt16BE(2) : buffer.readUInt32BE(2)
-
-    console.log('payload size:', buffer.length)
-
-    // --- Extract & Unmask Data ---
-    //if length < 126, key is indexes 2-6, < 65535 in indexes 4-8, past that indexes 10-14
-    //const keyByteIndex = payloadLength < 126 ? 2 : payloadLength < 65535 ? 4 : 10
-    //const keyByteIndex = payloadLength > 65535 ? 10 : payloadLength > 125 ? 4 : 2
-
-    const keyByteIndex = size < 126 ? 2 : size < 127 ? 4 : 10
-    const maskingKey = buffer.slice(keyByteIndex, keyByteIndex + 4)
-
-    //everything past masking key is payload data
-    const data = buffer.slice(keyByteIndex + 4, buffer.length)
-
-    if (isMasked && maskingKey) {
-        for (let i = 0; i < data.length; i++) { data[i] ^= maskingKey[i % 4] }
-    }
-
-    //if opcode is text, convert data to string, otherwise pass the binary
-    const payload = (opcode === OPCODES.TEXT) ? data.toString('utf8') : data
-
-    return { fin, opcode, payload }
-}
-*/
-
 
 /**
 const serverOptions = {

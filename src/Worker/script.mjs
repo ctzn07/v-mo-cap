@@ -1,4 +1,4 @@
-//worker front-end script
+//source manager front-end script
 import * as Tasks from '@mediapipe/tasks-vision'
 
 api.subscribe('console', (e, message) => console.log(message))

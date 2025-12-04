@@ -20,4 +20,4 @@ function moduleLoader(modulePath){
     import(modulePath).then(module => module.default(args))  
 }
 
-(args.worker) ? moduleLoader('./Worker/worker.mjs') : moduleLoader('./App/app.mjs')
+(args.worker) ? moduleLoader('./Worker/source.mjs') : moduleLoader('./App/app.mjs')
