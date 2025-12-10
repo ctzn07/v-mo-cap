@@ -2,7 +2,8 @@
 import { StrictMode, Children } from "react"
 import { createRoot } from 'react-dom/client'
 
-import { Page } from './gui.jsx'
+import { Sources } from './sources.jsx'
+import { Config } from "./config.jsx"
 import { Preview } from './preview.jsx'
 
 const root = createRoot(document.getElementById('root'))
@@ -48,16 +49,16 @@ function Main(){
     const dev = (
         <StrictMode>
             <MainWindow>
-                <Page id='devices' label={'Devices'} />
-                <Page id='config' label={'Config'} />
+                <Sources id='sources' label={'Sources'} />
+                <Config id='config' label={'Config'} />
                 <Preview id='preview' label={'Preview'} />
             </MainWindow>
         </StrictMode>)
 
     const prod = (
         <MainWindow>
-            <Page id='devices' label={'Devices'} />
-            <Page id='config' label={'Config'} />
+            <Sources id='sources' label={'Sources'} />
+            <Config id='config' label={'Config'} />
             <Preview id='preview' label={'Preview'} />
         </MainWindow>
     )

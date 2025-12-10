@@ -15,7 +15,7 @@ function quit(code){
 
 function connectWS(args){
     //connect to main process using websocket(wss is not supported)
-    const ws = new WebSocket(`ws://localhost:${args.port}/worker?token=${args.token}`, {perMessageDeflate: false})
+    const ws = new WebSocket(`ws://localhost:${args.port}/${args.path}?token=${args.token}`, {perMessageDeflate: false})
     //ws.binaryType = "arraybuffer"
     const wsi = new sourceAPI(ws)
     wsi.on('disconnect', () => quit())

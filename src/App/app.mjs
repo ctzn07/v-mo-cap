@@ -3,7 +3,6 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import EventEmitter from 'node:events'
 import { console } from '../common/logger.mjs'
 import { config } from '../common/config.mjs'
-import { gui } from './gui.mjs'
 import { server } from './server.mjs'
 import { sourceManager } from './sources.mjs'
 
@@ -13,41 +12,6 @@ import path from 'path'
 
 class IPCEmitter extends EventEmitter {}
 const ipcRender = new IPCEmitter()
-
-//helper function to send data to UI
-function updateUI(channel, data = null){
-    if(gui[channel]){ ipcRender.emit(channel, gui[channel](data)) }
-    else{ console.error(`Cannot call UI update on channel ${channel}`) }
-}
-
-//devicelist triggers multiple times for each connected usb device
-//adding a small timegate to only trigger on latest update
-let timer = null
-function manageDevices(list){
-    clearTimeout(timer)
-    timer = setTimeout(() => {
-        config.devicelist(list) //make sure devices have config entries
-        const newList = new Set(list)
-        const oldList = new Set(Object.keys(config.get('session/Devices') || {}))
-
-        for(const device of oldList){
-            if(!newList.has(device)){
-                //new device list no longer has entry -> set inactive & delete
-                config.set(`session/Devices/${device}/Active`, false)
-                config.delete(`session/Devices/${device}`)
-            }
-        }
-        for(const device of newList){
-            if(!oldList.has(device)){
-                //device has no entry, create new
-                const template = { 
-                    Active: false, 
-                }
-                config.set(`session/Devices/${device}`, template)
-            }
-        }
-    }, 500)
-}
 
 function createGUI(){
     const win = new BrowserWindow({
@@ -69,34 +33,38 @@ function createGUI(){
     console.log('New BrowserWindow: ', htmlpath)
 
     if(isDev())win.webContents.openDevTools()
-    
-    //Events for sending data to UI
-    ipcRender.on('devices', (data) => win.webContents.send('devices', data))
-    ipcRender.on('config', (data) => win.webContents.send('config', data))
-    ipcRender.on('preview', (data) => win.webContents.send('preview', data))
 
-    //config manager update events(channels correspond each config.json branch)
-    config.update.on('session/Devices', () => updateUI('devices'))
-    config.update.on('config/Devices', () => updateUI('devices'))
-    config.update.on('config/Tracking', () => updateUI('config'))
-    config.update.on('config/User', () => updateUI('config'))
+    //following config manager events trigger UI page updates
+    config.update.on('session/Sources', () => win.webContents.send('sources'))
+    config.update.on('config/Devices', () => win.webContents.send('sources'))
+    config.update.on('config/User', () => win.webContents.send('config'))
     
     //Events for receiving data from UI
     ipcMain.on('setconfig', (e, path, value) => config.set(path, value))
-    ipcMain.on('update', (e, channel) => updateUI(channel)) //generic UI update request
+    ipcMain.on('update', (e, channel) => console.log(`UI update requested on ${channel}`)) //generic UI update request
     
-    ipcMain.on('addSource', (e, path) => config.set(path, shortID()))
-    ipcMain.on('devicelist', (e, list) => manageDevices(list))
+    ipcMain.on('addSource', (e) => sourceManager.createSource())
+    ipcMain.on('removeSource', (e, id) => sourceManager.removeSource(id))
+    //ipcMain.on('addSource', (e) => console.log('addSource was called'))
+    ipcMain.on('devicelist', (e, list) => config.set('session/Devices/Connected', list))
 
     //Data requests events from UI
-    //ipcMain.handle('getconfig', (e, path) => { return config.get(path) })
+    ipcMain.handle('get', (e, path) => { return config.get(path) })
 
     //Utility events
-    ipcMain.on('logmessage', (e, msg) => { console.log(msg) })
-    ipcMain.on('logerror', (e, msg) => { console.error(msg) })
+    ipcMain.on('log', (e, msg) => { console.log(msg) })
+    ipcMain.on('error', (e, msg) => { console.error(msg) })
 
     //Server events
-    server.on('connect', (ws) => {
+    server.on('connect', (websocket, route, params) => {
+        switch (route) {
+            case sourceManager.sourcePath:
+                //this is a subprocess, register websocket with sourceManager
+                break;
+        
+            default:
+                break;
+        }
          //client connected->create sourceAPI for source manager
          
          //console.log('app.mjs: new client connection')
@@ -127,3 +95,31 @@ export default function initApp(args){
         server.stop(1001, 'Application closing')
     })
 }
+
+/**
+function manageDevices(list){
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+        config.devicelist(list) //make sure devices have config entries
+        const newList = new Set(list)
+        const oldList = new Set(Object.keys(config.get('session/Devices') || {}))
+
+        for(const device of oldList){
+            if(!newList.has(device)){
+                //new device list no longer has entry -> set inactive & delete
+                config.set(`session/Devices/${device}/Active`, false)
+                config.delete(`session/Devices/${device}`)
+            }
+        }
+        for(const device of newList){
+            if(!oldList.has(device)){
+                //device has no entry, create new
+                const template = { 
+                    Active: false, 
+                }
+                config.set(`session/Devices/${device}`, template)
+            }
+        }
+    }, 500)
+}
+ */

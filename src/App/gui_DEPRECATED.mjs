@@ -34,47 +34,6 @@ const deviceTemplate = (d) => {
     }
 }
 
-//formats config options for the UI
-const configTemplate = () => {
-return [
-    {
-        type: 'frame', 
-        horizontal: false, 
-        children: [
-            cTemplate('text', 'User Settings', null, null), 
-            cTemplate('select', 'Websocket Port', 'config/User/WebsocketPort', [8080,8081,8082]), 
-            cTemplate('select', 'Preferred GPU', 'config/User/PreferredGPU', ['dGPU', 'iGPU']), 
-        ],
-    }, 
-    {
-        type: 'frame', 
-        horizontal: false, 
-        children: [
-            cTemplate('text', 'Face Tracking', null, null), 
-            cTemplate('select', 'TrackingConfidence', 'config/Tracking/Face/TrackingConfidence', rangeoptions), 
-            cTemplate('select', 'Detection Hardware', 'config/Tracking/Face/Hardware', ['GPU', 'CPU']), 
-        ],
-    },
-    {
-        type: 'frame', 
-        horizontal: false, 
-        children: [
-            cTemplate('text', 'Hand Tracking', null, null), 
-            cTemplate('select', 'TrackingConfidence', 'config/Tracking/Hand/TrackingConfidence', rangeoptions), 
-            cTemplate('select', 'Detection Hardware', 'config/Tracking/Hand/Hardware', ['GPU', 'CPU']), 
-        ],
-    },
-    {
-        type: 'frame', 
-        horizontal: false, 
-        children: [
-            cTemplate('text', 'Body Tracking', null, null), 
-            cTemplate('select', 'TrackingConfidence', 'config/Tracking/Body/TrackingConfidence', rangeoptions), 
-            cTemplate('select', 'Detection Hardware', 'config/Tracking/Body/Hardware', ['GPU', 'CPU']), 
-        ],
-    },
-]
-}
 
 function injectValues(frame){
 frame.children.forEach(child => {
@@ -95,8 +54,9 @@ gui.devices = () => {
 }
 
 gui.config = () => {
-    const frames = configTemplate()
-    return frames.map(f => injectValues(f))
+    //const frames = configTemplate()
+    //return frames.map(f => injectValues(f))
+    return []
 }
 
 gui.preview = () => {

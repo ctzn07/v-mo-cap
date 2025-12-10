@@ -53,24 +53,7 @@ netserver.on('connect', (req, socket, head) => { /*console.log('server "connecti
 
 //https://nodejs.org/api/http.html#event-connection
 netserver.on('connection', (socket) => {
-    const websocket = new websocketInterface(socket)
-    /*
-    Events:
-    ('close', code, reason)
-    ('partial', data, fin)
-    ('message', data, isBinary)
-    ('error', code, reason)
-    Methods:
-    send(data)          //data will be sent as text if typeof data === 'string', binary otherwise
-    on(event, callback) //register event callback
-    off(event)          //remove event callback
-    close(code, reason) //close connection, arguments are optional
-    */
-   //broadcast new socket to listeners
-    server.emit('connect', websocket)
-    websocket.on('partial', (data, fin) => websocket.close(1002, 'Server does not support fragmented data'))
-    websocket.on('close', (code, reason) => { server.emit('disconnect', websocket, code, reason) })
-    websocket.on('error', (code, reason) => console.error(`netserver websocket error(${code}) - ${reason}`))
+    
 })
 
 netserver.on('request', (req, res) => { /*console.log('server "request" event')*/ })
@@ -84,8 +67,25 @@ netserver.on('upgrade', (req, socket, head) => {
     //console.log(JSON.stringify(params, null, 4))
 
     if(!authCheck(route, params)){ return } //not authorized, let request timeout(should probably return proper unauth response)
-    
-    console.log(`New Websocket client with route:${route}, params:${JSON.stringify(params)}`)
+
+    const websocket = new websocketInterface(socket)
+    /*
+    Events:
+    ('close', code, reason)
+    ('partial', data, fin)
+    ('message', data, isBinary)
+    ('error', code, reason)
+    Methods:
+    send(data)          //data will be sent as text if typeof data === 'string', binary otherwise
+    on(event, callback) //register event callback
+    off(event)          //remove event callback
+    close(code, reason) //close connection, arguments are optional
+    */
+    //broadcast new socket to listeners
+    server.emit('connect', websocket, route, params)
+    websocket.on('partial', (data, fin) => websocket.close(1002, 'Server does not support fragmented data'))
+    websocket.on('close', (code, reason) => { server.emit('disconnect', websocket, code, reason) })
+    websocket.on('error', (code, reason) => console.error(`netserver websocket error(${code}) - ${reason}`))
 
     const key = req.headers['sec-websocket-key']
     const websocketkey = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'

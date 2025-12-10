@@ -17,6 +17,7 @@ body {
   --text-color: #f0ebeb;
   --border-radius: 8px;
   --tab-width: 64px;
+  --tab-height: 64px;
   --toggle-size: 32px;
 
   color-scheme: light dark;
@@ -44,7 +45,7 @@ a {
   font-weight: 500;
   font-size: large;
   box-sizing: border-box;
-  border: 0px solid rgb(163, 163, 163);
+  border: 1px solid rgb(163, 163, 163);
   /*border-radius: var(--border-radius);*/
 }
 
@@ -65,9 +66,9 @@ a {
   width: var(--tab-width);
   min-width: var(--tab-width);
   max-width: var(--tab-width);
-  height: var(--tab-width);
-  min-height: var(--tab-width);
-  max-height: var(--tab-width);
+  height: var(--tab-height);
+  min-height: var(--tab-height);
+  max-height: var(--tab-height);
   white-space: wrap;
   border-radius: var(--border-radius);
   transition: all 0.2s;
@@ -101,9 +102,13 @@ a {
   overflow: auto;
 }
 
+.nav_margin {
+  margin-left: calc(var(--tab-width) + var(--main-spacing) * 2);
+}
+
 .frame {
   display: flex;
-  min-height: var(--tab-width);
+  min-height: var(--tab-height);
   max-height: fit-content;
   /*overflow: hidden;*/
   border: solid 2px var(--secondary-color);
@@ -118,7 +123,7 @@ a {
 
 .frame_content {
   width: 100%;
-  /*min-height: var(--tab-width);*/
+  /*min-height: var(--tab-height);*/
   overflow: hidden;
   /*margin: inherit;*/
   margin-top: auto;
@@ -128,7 +133,7 @@ a {
 
 .select {
   display: flex;
-  height: calc(var(--tab-width) / 2);
+  height: calc(var(--tab-height) / 2);
   padding: inherit;
 }
 

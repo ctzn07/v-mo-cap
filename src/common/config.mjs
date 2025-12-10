@@ -35,23 +35,8 @@ console.log('Config manager initialized')
 const configTemplate = {
     //list of all config variables and default values
     Devices: {}, 
-    Tracking: {
-        Face: {
-            Hardware: 'GPU',    //options: 'CPU', 'GPU'
-            TrackingConfidence: 0.5, 
-        }, 
-        Hand: {
-            Hardware: 'GPU',    //options: 'CPU', 'GPU'
-            TrackingConfidence: 0.5, 
-        }, 
-        Body: {
-            Hardware: 'GPU',    //options: 'CPU', 'GPU'
-            TrackingConfidence: 0.5, 
-        },
-    },
     User: { 
-        WebsocketPort: 8080, 
-        PreferredGPU: 'dGPU',   //options: 'dGPU', 'iGPU'
+        WebsocketPort: 8080
     }, 
 }
 
@@ -97,22 +82,39 @@ function writeFile(store_id){
 }
 
 //special function that makes sure new devices always have config entry
-config.devicelist = (list) => {
+function devicelist(list){
     //check for config entries
     for(const label of list){
         if(!datastorage['config'].Devices[label]){
+            console.log(`Adding config entry for ${label}`)
             //no entry for device exists, generate new one
             const template = {
-                label: label, 
-                id: crypto.randomUUID().split('-')[0], 
-                Face: false, 
-                Body: false, 
-                Hand: false, 
+                label: label,  
                 Calibration: {
                     Loc: {x: 0, y: 0, z: 0}, 
                     Rot: {x: 0, y: 0, z: 0}, 
-                    Lens: {k1: 0, k2: 0, k3: 0, centerX: 0.5, centerY: 0.5}
-                } 
+                    Lens: {k1: 0, k2: 0, k3: 0, centerX: 0.5, centerY: 0.5}, 
+                }, 
+                Tracking: {
+                    Face: {
+                        enabled: false, 
+                        minDetectionConfidence: 0.5, 
+                        minPresenceConfidence: 0.5, 
+                        minTrackingConfidence: 0.5
+                    }, 
+                    Body: {
+                        enabled: false, 
+                        minDetectionConfidence: 0.5, 
+                        minPresenceConfidence: 0.5, 
+                        minTrackingConfidence: 0.5
+                    }, 
+                    Hand: {
+                        enabled: false, 
+                        minDetectionConfidence: 0.5, 
+                        minPresenceConfidence: 0.5, 
+                        minTrackingConfidence: 0.5
+                    }
+                }
             }
             config.set(`config/Devices/${label}`, template)
         }
@@ -205,3 +207,6 @@ config.delete = (path) => {
 
 newStorage('config', config_path, configTemplate)
 newStorage('session', null, {})
+
+//update config entries for each device
+config.update.on('session/Devices/Connected', (list) => devicelist(list))
