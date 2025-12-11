@@ -59,7 +59,7 @@ function createGUI(){
     server.on('connect', (websocket, route, params) => {
         switch (route) {
             case sourceManager.sourcePath:
-                //this is a subprocess, register websocket with sourceManager
+                //sourceManager.registerSource(params)
                 break;
         
             default:

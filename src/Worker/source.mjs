@@ -12,16 +12,15 @@ function quit(code){
     app.exit(code)
 }
 
-
 function connectWS(args){
     //connect to main process using websocket(wss is not supported)
-    const ws = new WebSocket(`ws://localhost:${args.port}/${args.path}?token=${args.token}`, {perMessageDeflate: false})
+    const ws = new WebSocket(`ws://localhost:${args.port}/${args.path}?id=${args.id}`, {perMessageDeflate: false})
     //ws.binaryType = "arraybuffer"
     const wsi = new sourceAPI(ws)
     wsi.on('disconnect', () => quit())
     wsi.on('close', () => quit())
     
-    wsi.request('register-worker', args.token)
+    wsi.request('register', args.token)
     setInterval(() => { wsi.request('console.log', 'worker says ping') }, 2000)
 }
 

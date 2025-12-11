@@ -34,7 +34,7 @@ sourceManager.createSource = () => {
         worker: true, 
         port: server_port, 
         path: sourceManager.sourcePath, 
-        token: source.id, 
+        id: source.id, 
     }
 
     //encode JSON to launch arguments(see main.js for decode)
@@ -54,12 +54,14 @@ sourceManager.createSource = () => {
     
 }
 
-function registerSource(id, websocket){
+sourceManager.registerSource = (id, websocket) => {
+    console.log(`Registering source ${id}`)
     if(sources.has(id)){
         sources.set(id, new sourceAPI(websocket))
     }
     else{
         //id not recognized
+        console.log(`Failed to register source(${id})`)
         websocket.close()
     }
     

@@ -9,10 +9,10 @@ function NewSource(){
     const callback = (e) => {e.preventDefault(); api.send('addSource')}
     //TODO: if options length is more than 2 and/or text is not provided, toggle settings are wrong
     return (
-        <div className='nav_margin' >
-            <button className='button_large' onClick={e => callback(e)}>
-                {'+ New Source'}<br />
-            </button>
+        <div className='frame' >
+                <button className='button_large' onClick={e => callback(e)}>
+                    {'+ New Source'}<br />
+                </button>
         </div>
     )
 }
@@ -28,10 +28,9 @@ function RemoveSource({ source_id }){
 
 function SourceEntry({data}){
     return (
-        <div className='frame' style={{display: 'block'}}  >
-            <div className='frame_content'>{data.label}{`(${data.id})`}</div>
-            {`this is a source entry for ${data.label}`}
-            <br />
+        <div className='frame' style={{display: 'flex'}}  >
+            <div className='frame_title'>{data.label}</div>
+            <div className='frame_content'>{`this is a source entry for ${data.id}`}</div>
             <RemoveSource source_id={data.id} />
         </div>
     )
@@ -53,16 +52,11 @@ export function Sources({ id }){
                     .catch(e => api.send('error', `Sources GUI: ${e}`))
             })
         }
-        const cleanup = () => { api.unsubscribe(id, subscribe) }
+        
         subscribe(id)   //subscribe to UI updates
         
-        return cleanup
+        return () => api.unsubscribe(id, subscribe)
     }, [])
 
-    return (
-        <div className={'page anim_fade'} id={id} >
-            <NewSource />
-            {content}
-        </div>
-    )
+    return (<><NewSource />{content}</>)
 }

@@ -108,7 +108,7 @@ export function Preview({ id }) {
                 renderer.setSize(width, height)
                 camera.aspect = width / height
                 camera.updateProjectionMatrix()
-            }, 100)
+            }, 500)
         }
         //call initial size update
         updateSize()
@@ -116,16 +116,13 @@ export function Preview({ id }) {
         //add eventlistener for resizing
         addEventListener('resize', updateSize)
 
-        const cleanup = () => {
-            api.unsubscribe(id, subscribe)
-            removeEventListener('resize', updateSize)
+        //cleanup
+        return () => {
+          removeEventListener('resize', updateSize)
+          api.unsubscribe(id, subscribe)
         }
-        //cleanup return
-        return cleanup
 
     }, [ container, renderer.domElement ])
 
-    return <div className={'page anim_fade'} id={id} >
-            <div ref={ container } style={{width: '100%', height: '100%'}} />
-    </div>
+    return (<div ref={ container } style={{height: '100%', width: '100%', padding: '0px'}} />)
 }

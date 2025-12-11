@@ -1,5 +1,5 @@
 //script for App main GUI
-import { StrictMode, Children } from "react"
+import { StrictMode, Children, useState } from "react"
 import { createRoot } from 'react-dom/client'
 
 import { Sources } from './sources.jsx'
@@ -24,44 +24,38 @@ navigator.mediaDevices.ondevicechange = () => {
 }
 navigator.mediaDevices.ondevicechange() //call initial update
 
-function scrollTo(id){
-    document.getElementById(id).scrollIntoView({ block: 'center' })
-}
-
-function TabButton({ scrollTarget, label }){
-    return <button className='button_large' onClick={ () => {scrollTo(scrollTarget)} }>
-            {label}
-        </button>
+const TABS = {
+    sources: <Sources id='sources' label={'Sources'} />, 
+    config: <Config id='config' label={'Config'} />, 
+    preview: <Preview id='preview' label={'Preview'} />
 }
 
 function MainWindow({ children }){
-    return <>
-        <div className='tab' >
-            {Children.toArray(children).map((page, index) => {
-                return <TabButton key={'tab_' + index} scrollTarget={page.props.id} label={page.props.label} />
-            })}
-        </div>
-        {children}
-    </>
+    const [tab, setTab] = useState('sources')
+    const navButtons = []
+    Object.keys(TABS).forEach((p, i) => {
+        navButtons.push(<button key={'nav_' + i} onClick={() => setTab(p)}>{TABS[p].props.label}</button>)
+    })
+
+    /*
+    const navButtons = pages.map((page, index) => {
+                console.log(`creating nav button for ${page.props.id}`)
+                return <button key={'nav_' + index} onClick={() => { setSelectedTab(page.props.id)} }>{page.props.label}</button>
+            })
+    */
+    return (<>
+        <div className='navigation'>{navButtons}</div>
+        <div className={'page anim_fade'} id={tab}>{TABS[tab]}</div>
+    </>)
 }
 
 function Main(){
     const dev = (
         <StrictMode>
-            <MainWindow>
-                <Sources id='sources' label={'Sources'} />
-                <Config id='config' label={'Config'} />
-                <Preview id='preview' label={'Preview'} />
-            </MainWindow>
+            <MainWindow />
         </StrictMode>)
 
-    const prod = (
-        <MainWindow>
-            <Sources id='sources' label={'Sources'} />
-            <Config id='config' label={'Config'} />
-            <Preview id='preview' label={'Preview'} />
-        </MainWindow>
-    )
+    const prod = ( <MainWindow /> )
     return isDev ? dev : prod
 }
 

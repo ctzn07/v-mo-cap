@@ -13,16 +13,14 @@ export function Config({ id }){
                 //this event fires when relevant data changes in the backend
                 //TODO: use config.get to retrieve relevant data
             })
+            return this
         }
-        const cleanup = () => { api.unsubscribe(id, subscribe) }
+
+        
         subscribe(id)   //subscribe to UI updates
         
-        return cleanup
+        return () => api.unsubscribe(id, subscribe)
     }, [])
 
-    return (
-        <div className={'page anim_fade'} id={id} >
-            {'this is config page'}
-        </div>
-    )
+    return (<>{'this is config page'}</>)
 }
