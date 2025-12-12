@@ -103,12 +103,12 @@ export function Preview({ id }) {
             renderer.setSize(0, 0)
             if(timegate)clearTimeout(timegate)
             timegate = setTimeout(() => {
-                const width = container.current.clientWidth
-                const height = container.current.clientHeight
+                const width = container?.current?.clientWidth || 0
+                const height = container?.current?.clientHeight || 0
                 renderer.setSize(width, height)
                 camera.aspect = width / height
                 camera.updateProjectionMatrix()
-            }, 500)
+            }, 100)
         }
         //call initial size update
         updateSize()

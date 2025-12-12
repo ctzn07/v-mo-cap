@@ -2,7 +2,7 @@
 import { StrictMode, Children, useState } from "react"
 import { createRoot } from 'react-dom/client'
 
-import { Sources } from './sources.jsx'
+import { SourceList } from './sources.jsx'
 import { Config } from "./config.jsx"
 import { Preview } from './preview.jsx'
 
@@ -24,38 +24,52 @@ navigator.mediaDevices.ondevicechange = () => {
 }
 navigator.mediaDevices.ondevicechange() //call initial update
 
-const TABS = {
-    sources: <Sources id='sources' label={'Sources'} />, 
-    config: <Config id='config' label={'Config'} />, 
-    preview: <Preview id='preview' label={'Preview'} />
-}
+const pages = [
+    <SourceList id='sources' label={'Sources'} />, 
+    <Config id='config' label={'Config'} />, 
+    <Preview id='preview' label={'Preview'} />
+]
 
-function MainWindow({ children }){
-    const [tab, setTab] = useState('sources')
+function Window({ children }){
+    //create initial array or page order [1, 2, 3...]
+    const [pageOrder, setPageOrder] = useState([...Array(pages.length).keys()])
+
+    const reOrder = (index) => {
+        //set desired index to first
+        pageOrder.unshift(index)
+        //remove duplicates by set conversion, spread back to array
+        const newOrder = [...new Set(pageOrder)]
+        console.log('new page order', newOrder)
+        setPageOrder(newOrder)
+    }
+    
     const navButtons = []
-    Object.keys(TABS).forEach((p, i) => {
-        navButtons.push(<button key={'nav_' + i} onClick={() => setTab(p)}>{TABS[p].props.label}</button>)
+    pages.forEach((p, i) => {
+        navButtons.push(<button key={'nav_' + i} onClick={() => reOrder(i)}>{p.props.label}</button>)
     })
 
-    /*
-    const navButtons = pages.map((page, index) => {
-                console.log(`creating nav button for ${page.props.id}`)
-                return <button key={'nav_' + index} onClick={() => { setSelectedTab(page.props.id)} }>{page.props.label}</button>
-            })
-    */
-    return (<>
+    //const customStyle = (i) => {return {transform: `translate(${i*500*-1}px, 0px)`}}
+    const customStyle = (i) => {return i ? {opacity: '0', transform: 'translate(-100px, 0px)', zIndex: -1} : {opacity: '1', transform: 'translate(0px, 0px)', zIndex: 0}}
+    
+    //anim_expand : anim_shrink
+    return (<div style={{display: 'flex', height: '100%'}}>
         <div className='navigation'>{navButtons}</div>
-        <div className={'page anim_fade'} id={tab}>{TABS[tab]}</div>
-    </>)
+        <div className='page_wrapper'>{pageOrder.map((index, i) => {
+            return <div className='page' style={customStyle(i)} id={pages[index].props.id} key={`page_${index}`} > {pages[index]} </div>
+        })}</div>
+        
+    </div>)
 }
+//<div className={'page anim_expand'} id={pages[pageOrder[0]].props.id}>{pages[pageOrder[0]]}</div>
 
 function Main(){
     const dev = (
         <StrictMode>
-            <MainWindow />
-        </StrictMode>)
+            <Window />
+        </StrictMode>
+    )
 
-    const prod = ( <MainWindow /> )
+    const prod = ( <Window /> )
     return isDev ? dev : prod
 }
 
